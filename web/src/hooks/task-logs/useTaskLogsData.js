@@ -301,6 +301,42 @@ export const useTaskLogsData = () => {
     }
   };
 
+  // Sync task state
+  const [syncAllLoading, setSyncAllLoading] = useState(false);
+
+  const syncTask = async (taskId) => {
+    try {
+      const res = await API.post(`/api/task/sync?task_id=${taskId}`);
+      const { success, message } = res.data;
+      if (success) {
+        showSuccess(t('同步成功'));
+        await refresh();
+      } else {
+        showError(message);
+      }
+    } catch (e) {
+      showError(t('同步请求失败'));
+    }
+  };
+
+  const syncAllTasks = async () => {
+    setSyncAllLoading(true);
+    try {
+      const res = await API.post('/api/task/sync-all');
+      const { success, message, data } = res.data;
+      if (success) {
+        showSuccess(t('同步完成') + `: ${t('成功')} ${data.synced}, ${t('失败')} ${data.failed}`);
+        await refresh();
+      } else {
+        showError(message);
+      }
+    } catch (e) {
+      showError(t('同步请求失败'));
+    } finally {
+      setSyncAllLoading(false);
+    }
+  };
+
   // Initialize data
   useEffect(() => {
     const localPageSize =
@@ -369,6 +405,11 @@ export const useTaskLogsData = () => {
     openAudioModal,
     enrichLogs,
     syncPageData,
+
+    // Sync
+    syncTask,
+    syncAllTasks,
+    syncAllLoading,
 
     // Translation
     t,

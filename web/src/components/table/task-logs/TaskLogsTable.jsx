@@ -43,6 +43,7 @@ const TaskLogsTable = (taskLogsData) => {
     openAudioModal,
     showUserInfoFunc,
     isAdminUser,
+    syncTask,
     t,
     COLUMN_KEYS,
   } = taskLogsData;
@@ -58,12 +59,13 @@ const TaskLogsTable = (taskLogsData) => {
       openAudioModal,
       showUserInfoFunc,
       isAdminUser,
+      syncTask,
     });
-  }, [t, COLUMN_KEYS, copyText, openContentModal, openVideoModal, openAudioModal, showUserInfoFunc, isAdminUser]);
+  }, [t, COLUMN_KEYS, copyText, openContentModal, openVideoModal, openAudioModal, showUserInfoFunc, isAdminUser, syncTask]);
 
   // Filter columns based on visibility settings
   const getVisibleColumns = () => {
-    return allColumns.filter((column) => visibleColumns[column.key]);
+    return allColumns.filter((column) => column.key === 'actions' || visibleColumns[column.key]);
   };
 
   const visibleColumnsList = useMemo(() => {

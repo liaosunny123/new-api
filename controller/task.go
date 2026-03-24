@@ -66,6 +66,33 @@ func GetUserTask(c *gin.Context) {
 	common.ApiSuccess(c, pageInfo)
 }
 
+// SyncTask 手动同步单个任务状态
+func SyncTask(c *gin.Context) {
+	taskID := c.Query("task_id")
+	if taskID == "" {
+		common.ApiErrorMsg(c, "task_id 不能为空")
+		return
+	}
+	if err := service.SyncSingleTask(c.Request.Context(), taskID); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+// SyncAllTasks 同步所有未完成任务
+func SyncAllTasks(c *gin.Context) {
+	synced, failed, err := service.SyncAllUnfinishedTasks(c.Request.Context())
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{
+		"synced": synced,
+		"failed": failed,
+	})
+}
+
 func tasksToDto(tasks []*model.Task, fillUser bool) []*dto.TaskDto {
 	var userIdMap map[int]*model.UserBase
 	if fillUser {

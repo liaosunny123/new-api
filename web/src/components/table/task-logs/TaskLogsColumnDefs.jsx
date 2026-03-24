@@ -18,7 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Progress, Tag, Tooltip, Typography } from '@douyinfe/semi-ui';
+import { Button, Progress, Tag, Tooltip, Typography } from '@douyinfe/semi-ui';
+import { IconSync } from '@douyinfe/semi-icons';
 import {
   Music,
   FileText,
@@ -241,6 +242,7 @@ export const getTaskLogsColumns = ({
   isAdminUser,
   openVideoModal,
   openAudioModal,
+  syncTask,
 }) => {
   return [
     {
@@ -446,5 +448,32 @@ export const getTaskLogsColumns = ({
         );
       },
     },
+    // Admin-only sync action column
+    ...(isAdminUser && syncTask
+      ? [
+          {
+            key: 'actions',
+            title: t('操作'),
+            fixed: 'right',
+            width: 80,
+            render: (text, record) => {
+              const isTerminal =
+                record.status === 'SUCCESS' || record.status === 'FAILURE';
+              if (isTerminal) return null;
+              return (
+                <Button
+                  icon={<IconSync />}
+                  size='small'
+                  theme='borderless'
+                  type='tertiary'
+                  onClick={() => syncTask(record.task_id)}
+                >
+                  {t('同步')}
+                </Button>
+              );
+            },
+          },
+        ]
+      : []),
   ];
 };

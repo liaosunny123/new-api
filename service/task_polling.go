@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -331,12 +332,27 @@ func updateVideoTasks(ctx context.Context, platform constant.TaskPlatform, chann
 	}
 	info.ApiKey = cacheGetChannel.Key
 	adaptor.Init(info)
-	for _, taskId := range taskIds {
-		if err := updateVideoSingleTask(ctx, adaptor, cacheGetChannel, taskId, taskM); err != nil {
-			logger.LogError(ctx, fmt.Sprintf("Failed to update video task %s: %s", taskId, err.Error()))
+
+	// 50 一批，批内并发查询更新
+	const batchSize = 50
+	for i := 0; i < len(taskIds); i += batchSize {
+		end := i + batchSize
+		if end > len(taskIds) {
+			end = len(taskIds)
 		}
-		// sleep 1 second between each task to avoid hitting rate limits of upstream platforms
-		time.Sleep(1 * time.Second)
+		batch := taskIds[i:end]
+
+		var wg sync.WaitGroup
+		for _, taskId := range batch {
+			wg.Add(1)
+			go func(tid string) {
+				defer wg.Done()
+				if err := updateVideoSingleTask(ctx, adaptor, cacheGetChannel, tid, taskM); err != nil {
+					logger.LogError(ctx, fmt.Sprintf("Failed to update video task %s: %s", tid, err.Error()))
+				}
+			}(taskId)
+		}
+		wg.Wait()
 	}
 	return nil
 }
@@ -557,4 +573,192 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 		return
 	}
 	// 3. 无调整，保持预扣额度
+}
+
+// ---- 按需同步（用户查询时触发）----
+
+// taskSyncCache 记录每个 taskID 最近一次同步的时间，5s 内不重复查上游
+var taskSyncCache sync.Map // key: taskID (string), value: time.Time
+
+const onDemandSyncCooldown = 5 * time.Second
+
+func init() {
+	// 每 60s 清理过期缓存条目，避免内存无限增长
+	go func() {
+		for {
+			time.Sleep(60 * time.Second)
+			taskSyncCache.Range(func(key, value any) bool {
+				if time.Since(value.(time.Time)) > onDemandSyncCooldown {
+					taskSyncCache.Delete(key)
+				}
+				return true
+			})
+		}
+	}()
+}
+
+// SyncTaskOnDemand 用户查询任务时按需同步：非终态 + 超过 5s 缓存 → 查上游并更新 DB。
+// task 对象会被就地更新为最新状态。
+func SyncTaskOnDemand(ctx context.Context, task *model.Task) {
+	if task == nil {
+		return
+	}
+	// 终态不查
+	if task.Status == model.TaskStatusSuccess || task.Status == model.TaskStatusFailure {
+		return
+	}
+	// 5s 缓存
+	if last, ok := taskSyncCache.Load(task.TaskID); ok {
+		if time.Since(last.(time.Time)) < onDemandSyncCooldown {
+			return
+		}
+	}
+	taskSyncCache.Store(task.TaskID, time.Now())
+
+	upstreamID := task.GetUpstreamTaskID()
+	if upstreamID == "" {
+		return
+	}
+	ch, err := model.CacheGetChannel(task.ChannelId)
+	if err != nil {
+		return
+	}
+	adaptor := GetTaskAdaptorFunc(task.Platform)
+	if adaptor == nil {
+		return
+	}
+	info := &relaycommon.RelayInfo{}
+	info.ChannelMeta = &relaycommon.ChannelMeta{
+		ChannelBaseUrl: ch.GetBaseURL(),
+	}
+	info.ApiKey = ch.Key
+	adaptor.Init(info)
+
+	taskM := map[string]*model.Task{upstreamID: task}
+	_ = updateVideoSingleTask(ctx, adaptor, ch, upstreamID, taskM)
+}
+
+// SyncSingleTask 手动同步单个任务状态（管理员操作）
+func SyncSingleTask(ctx context.Context, taskID string) error {
+	task, exists, err := model.GetByOnlyTaskId(taskID)
+	if err != nil {
+		return fmt.Errorf("查询任务失败: %w", err)
+	}
+	if !exists || task == nil {
+		return fmt.Errorf("任务不存在: %s", taskID)
+	}
+	if task.Status == model.TaskStatusSuccess || task.Status == model.TaskStatusFailure {
+		return fmt.Errorf("任务已终结，无需同步")
+	}
+
+	upstreamID := task.GetUpstreamTaskID()
+	if upstreamID == "" {
+		return fmt.Errorf("任务缺少上游 ID")
+	}
+
+	ch, err := model.CacheGetChannel(task.ChannelId)
+	if err != nil {
+		return fmt.Errorf("获取渠道失败: %w", err)
+	}
+
+	adaptor := GetTaskAdaptorFunc(task.Platform)
+	if adaptor == nil {
+		return fmt.Errorf("平台适配器不存在: %s", task.Platform)
+	}
+
+	info := &relaycommon.RelayInfo{}
+	info.ChannelMeta = &relaycommon.ChannelMeta{
+		ChannelBaseUrl: ch.GetBaseURL(),
+	}
+	info.ApiKey = ch.Key
+	adaptor.Init(info)
+
+	taskM := map[string]*model.Task{upstreamID: task}
+	return updateVideoSingleTask(ctx, adaptor, ch, upstreamID, taskM)
+}
+
+// SyncAllUnfinishedTasks 并发同步所有未完成任务（并发度 50）
+func SyncAllUnfinishedTasks(ctx context.Context) (synced int, failed int, err error) {
+	allTasks := model.GetAllUnFinishSyncTasks(10000)
+	if len(allTasks) == 0 {
+		return 0, 0, nil
+	}
+
+	// 按 platform + channel 分组
+	type channelGroup struct {
+		platform  constant.TaskPlatform
+		channelId int
+		tasks     []*model.Task
+	}
+	groupKey := func(t *model.Task) string {
+		return fmt.Sprintf("%s:%d", t.Platform, t.ChannelId)
+	}
+	groupMap := make(map[string]*channelGroup)
+	for _, t := range allTasks {
+		key := groupKey(t)
+		if _, ok := groupMap[key]; !ok {
+			groupMap[key] = &channelGroup{platform: t.Platform, channelId: t.ChannelId}
+		}
+		groupMap[key].tasks = append(groupMap[key].tasks, t)
+	}
+
+	sem := make(chan struct{}, 50)
+	type result struct {
+		ok bool
+	}
+	resultCh := make(chan result, len(allTasks))
+
+	for _, grp := range groupMap {
+		ch, chErr := model.CacheGetChannel(grp.channelId)
+		if chErr != nil {
+			for range grp.tasks {
+				resultCh <- result{ok: false}
+			}
+			continue
+		}
+		adaptor := GetTaskAdaptorFunc(grp.platform)
+		if adaptor == nil {
+			for range grp.tasks {
+				resultCh <- result{ok: false}
+			}
+			continue
+		}
+		info := &relaycommon.RelayInfo{}
+		info.ChannelMeta = &relaycommon.ChannelMeta{
+			ChannelBaseUrl: ch.GetBaseURL(),
+		}
+		info.ApiKey = ch.Key
+		adaptor.Init(info)
+
+		for _, t := range grp.tasks {
+			upstreamID := t.GetUpstreamTaskID()
+			if upstreamID == "" {
+				resultCh <- result{ok: false}
+				continue
+			}
+			taskM := map[string]*model.Task{upstreamID: t}
+			sem <- struct{}{}
+			go func(taskId string, tm map[string]*model.Task) {
+				defer func() { <-sem }()
+				if syncErr := updateVideoSingleTask(ctx, adaptor, ch, taskId, tm); syncErr != nil {
+					logger.LogError(ctx, fmt.Sprintf("SyncAll: task %s failed: %s", taskId, syncErr.Error()))
+					resultCh <- result{ok: false}
+				} else {
+					resultCh <- result{ok: true}
+				}
+			}(upstreamID, taskM)
+		}
+	}
+
+	// 收集结果
+	total := len(allTasks)
+	for i := 0; i < total; i++ {
+		r := <-resultCh
+		if r.ok {
+			synced++
+		} else {
+			failed++
+		}
+	}
+	return synced, failed, nil
 }

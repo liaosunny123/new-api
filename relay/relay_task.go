@@ -376,6 +376,9 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 		return
 	}
 
+	// 按需同步：非终态任务查上游（5s 缓存防频繁）
+	service.SyncTaskOnDemand(c.Request.Context(), originTask)
+
 	isOpenAIVideoAPI := strings.HasPrefix(c.Request.RequestURI, "/v1/videos/")
 
 	// Gemini/Vertex 支持实时查询：用户 fetch 时直接从上游拉取最新状态
