@@ -47,6 +47,8 @@ import GroupTable from './components/GroupTable';
 import AutoGroupList from './components/AutoGroupList';
 import GroupGroupRatioRules from './components/GroupGroupRatioRules';
 import GroupSpecialUsableRules from './components/GroupSpecialUsableRules';
+import GroupRateLimitRules from './components/GroupRateLimitRules';
+import GroupGroupRateLimitRules from './components/GroupGroupRateLimitRules';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -57,6 +59,8 @@ const OPTION_KEYS = [
   'group_ratio_setting.group_special_usable_group',
   'AutoGroups',
   'DefaultUseAutoGroup',
+  'GroupRPMConcurrencyLimit',
+  'GroupGroupRPMConcurrencyLimit',
 ];
 
 function parseJSONSafe(str, fallback) {
@@ -81,6 +85,8 @@ export default function GroupRatioSettings(props) {
     'group_ratio_setting.group_special_usable_group': '',
     AutoGroups: '',
     DefaultUseAutoGroup: false,
+    GroupRPMConcurrencyLimit: '',
+    GroupGroupRPMConcurrencyLimit: '',
   });
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
@@ -176,6 +182,14 @@ export default function GroupRatioSettings(props) {
     }));
   }, []);
 
+  const handleGroupRateLimitChange = useCallback((value) => {
+    setInputs((prev) => ({ ...prev, GroupRPMConcurrencyLimit: value }));
+  }, []);
+
+  const handleGroupGroupRateLimitChange = useCallback((value) => {
+    setInputs((prev) => ({ ...prev, GroupGroupRPMConcurrencyLimit: value }));
+  }, []);
+
   const dv = dataVersionRef.current;
 
   const renderVisualMode = () => (
@@ -248,6 +262,30 @@ export default function GroupRatioSettings(props) {
           value={inputs['group_ratio_setting.group_special_usable_group']}
           groupNames={groupNames}
           onChange={handleSpecialUsableChange}
+        />
+      </Form.Section>
+
+      <Form.Section text={t('分组 RPM/并发限制')}>
+        <Text type='tertiary' size='small' style={{ display: 'block', marginBottom: 12 }}>
+          {t('为分组设置 RPM（每分钟请求数）和并发请求数限制。0 表示不限制。此为分组默认限制，可被用户级别覆盖')}
+        </Text>
+        <GroupRateLimitRules
+          key={`grl_${dv}`}
+          value={inputs.GroupRPMConcurrencyLimit}
+          groupNames={groupNames}
+          onChange={handleGroupRateLimitChange}
+        />
+      </Form.Section>
+
+      <Form.Section text={t('分组特殊 RPM/并发限制')}>
+        <Text type='tertiary' size='small' style={{ display: 'block', marginBottom: 12 }}>
+          {t('当特定用户分组使用某个渠道分组时，可设置特殊的 RPM/并发限制覆盖分组默认限制。类似分组特殊倍率的结构')}
+        </Text>
+        <GroupGroupRateLimitRules
+          key={`ggrl_${dv}`}
+          value={inputs.GroupGroupRPMConcurrencyLimit}
+          groupNames={groupNames}
+          onChange={handleGroupGroupRateLimitChange}
         />
       </Form.Section>
     </Form>
@@ -364,6 +402,54 @@ export default function GroupRatioSettings(props) {
                   ...prev,
                   'group_ratio_setting.group_special_usable_group': value,
                 }))
+              }
+            />
+          </Col>
+        </Row>
+        <Row gutter={16}>
+          <Col xs={24} sm={16}>
+            <Form.TextArea
+              label={t('分组 RPM/并发限制')}
+              placeholder={'{\n  "default": {"rpm": 60, "concurrency": 5}\n}'}
+              extraText={t(
+                '为分组设置RPM和并发限制。格式：{"分组名": {"rpm": 数值, "concurrency": 数值}}，0表示不限制',
+              )}
+              field={'GroupRPMConcurrencyLimit'}
+              autosize={{ minRows: 4, maxRows: 12 }}
+              trigger='blur'
+              stopValidateWithError
+              rules={[
+                {
+                  validator: (rule, value) => verifyJSON(value),
+                  message: t('不是合法的 JSON 字符串'),
+                },
+              ]}
+              onChange={(value) =>
+                setInputs((prev) => ({ ...prev, GroupRPMConcurrencyLimit: value }))
+              }
+            />
+          </Col>
+        </Row>
+        <Row gutter={16}>
+          <Col xs={24} sm={16}>
+            <Form.TextArea
+              label={t('分组特殊 RPM/并发限制')}
+              placeholder={'{\n  "vip": {\n    "default": {"rpm": 100, "concurrency": 8}\n  }\n}'}
+              extraText={t(
+                '嵌套结构：用户分组 → 渠道分组 → {rpm, concurrency}。当特定用户分组使用某渠道分组时的限制覆盖',
+              )}
+              field={'GroupGroupRPMConcurrencyLimit'}
+              autosize={{ minRows: 4, maxRows: 12 }}
+              trigger='blur'
+              stopValidateWithError
+              rules={[
+                {
+                  validator: (rule, value) => verifyJSON(value),
+                  message: t('不是合法的 JSON 字符串'),
+                },
+              ]}
+              onChange={(value) =>
+                setInputs((prev) => ({ ...prev, GroupGroupRPMConcurrencyLimit: value }))
               }
             />
           </Col>

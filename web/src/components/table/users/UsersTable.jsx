@@ -32,6 +32,7 @@ import DeleteUserModal from './modals/DeleteUserModal';
 import ResetPasskeyModal from './modals/ResetPasskeyModal';
 import ResetTwoFAModal from './modals/ResetTwoFAModal';
 import UserSubscriptionsModal from './modals/UserSubscriptionsModal';
+import UserRateLimitModal from './modals/UserRateLimitModal';
 
 const UsersTable = (usersData) => {
   const {
@@ -64,6 +65,7 @@ const UsersTable = (usersData) => {
   const [showResetTwoFAModal, setShowResetTwoFAModal] = useState(false);
   const [showUserSubscriptionsModal, setShowUserSubscriptionsModal] =
     useState(false);
+  const [showRateLimitModal, setShowRateLimitModal] = useState(false);
 
   // Modal handlers
   const showPromoteUserModal = (user) => {
@@ -100,6 +102,11 @@ const UsersTable = (usersData) => {
   const showUserSubscriptionsUserModal = (user) => {
     setModalUser(user);
     setShowUserSubscriptionsModal(true);
+  };
+
+  const showRateLimitUserModal = (user) => {
+    setModalUser(user);
+    setShowRateLimitModal(true);
   };
 
   // Modal confirm handlers
@@ -141,6 +148,7 @@ const UsersTable = (usersData) => {
       showResetPasskeyModal: showResetPasskeyUserModal,
       showResetTwoFAModal: showResetTwoFAUserModal,
       showUserSubscriptionsModal: showUserSubscriptionsUserModal,
+      showRateLimitModal: showRateLimitUserModal,
     });
   }, [
     t,
@@ -153,6 +161,7 @@ const UsersTable = (usersData) => {
     showResetPasskeyUserModal,
     showResetTwoFAUserModal,
     showUserSubscriptionsUserModal,
+    showRateLimitUserModal,
   ]);
 
   // Handle compact mode by removing fixed positioning
@@ -259,6 +268,13 @@ const UsersTable = (usersData) => {
         user={modalUser}
         t={t}
         onSuccess={() => refresh?.()}
+      />
+
+      <UserRateLimitModal
+        visible={showRateLimitModal}
+        onCancel={() => setShowRateLimitModal(false)}
+        userId={modalUser?.id}
+        username={modalUser?.username || ''}
       />
     </>
   );

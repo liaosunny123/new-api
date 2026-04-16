@@ -209,6 +209,7 @@ const renderOperations = (
     showResetPasskeyModal,
     showResetTwoFAModal,
     showUserSubscriptionsModal,
+    showRateLimitModal,
     t,
   },
 ) => {
@@ -221,6 +222,11 @@ const renderOperations = (
       node: 'item',
       name: t('订阅管理'),
       onClick: () => showUserSubscriptionsModal(record),
+    },
+    {
+      node: 'item',
+      name: t('限流设置'),
+      onClick: () => showRateLimitModal(record),
     },
     {
       node: 'divider',
@@ -309,6 +315,7 @@ export const getUsersColumns = ({
   showResetPasskeyModal,
   showResetTwoFAModal,
   showUserSubscriptionsModal,
+  showRateLimitModal,
 }) => {
   return [
     {
@@ -366,6 +373,7 @@ export const getUsersColumns = ({
           showResetPasskeyModal,
           showResetTwoFAModal,
           showUserSubscriptionsModal,
+          showRateLimitModal,
           t,
         }),
     },

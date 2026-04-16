@@ -57,6 +57,7 @@ import {
   IconEdit,
 } from '@douyinfe/semi-icons';
 import UserBindingManagementModal from './UserBindingManagementModal';
+import UserRateLimitModal from './UserRateLimitModal';
 
 const { Text, Title } = Typography;
 
@@ -72,6 +73,7 @@ const EditUserModal = (props) => {
   const isMobile = useIsMobile();
   const [groupOptions, setGroupOptions] = useState([]);
   const [bindingModalVisible, setBindingModalVisible] = useState(false);
+  const [rateLimitModalVisible, setRateLimitModalVisible] = useState(false);
   const formApiRef = useRef(null);
   const [showAdjustQuotaRaw, setShowAdjustQuotaRaw] = useState(false);
   const [showQuotaInput, setShowQuotaInput] = useState(false);
@@ -446,6 +448,38 @@ const EditUserModal = (props) => {
                     </div>
                   </Card>
                 )}
+
+                {/* 限流设置入口 */}
+                {userId && (
+                  <Card className='!rounded-2xl shadow-sm border-0'>
+                    <div className='flex items-center justify-between gap-3'>
+                      <div className='flex items-center min-w-0'>
+                        <Avatar
+                          size='small'
+                          color='orange'
+                          className='mr-2 shadow-md'
+                        >
+                          <IconUserGroup size={16} />
+                        </Avatar>
+                        <div className='min-w-0'>
+                          <Text className='text-lg font-medium'>
+                            {t('限流设置')}
+                          </Text>
+                          <div className='text-xs text-gray-600'>
+                            {t('查看和管理用户的分组RPM/并发限制')}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        type='primary'
+                        theme='outline'
+                        onClick={() => setRateLimitModalVisible(true)}
+                      >
+                        {t('管理限流')}
+                      </Button>
+                    </div>
+                  </Card>
+                )}
               </div>
             )}
           </Form>
@@ -458,6 +492,13 @@ const EditUserModal = (props) => {
         userId={userId}
         isMobile={isMobile}
         formApiRef={formApiRef}
+      />
+
+      <UserRateLimitModal
+        visible={rateLimitModalVisible}
+        onCancel={() => setRateLimitModalVisible(false)}
+        userId={userId}
+        username={inputs?.username || ''}
       />
 
       {/* 调整额度模态框 */}

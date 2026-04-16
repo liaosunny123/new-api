@@ -58,6 +58,7 @@ export default function GeneralSettings(props) {
     DemoSiteEnabled: false,
     SelfUseModeEnabled: false,
     'token_setting.max_user_tokens': 1000,
+    RateLimitExceededMessage: '',
   });
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
@@ -401,6 +402,20 @@ export default function GeneralSettings(props) {
                   extraText={t('每个用户最多可创建的令牌数量，默认 1000，设置过大可能会影响性能')}
                   placeholder={'1000'}
                   onChange={handleFieldChange('token_setting.max_user_tokens')}
+                />
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={16}>
+                <Form.TextArea
+                  label={t('RPM/并发超限错误提示 (503)')}
+                  placeholder={t('留空使用默认消息')}
+                  extraText={t(
+                    '当用户超过分组RPM或并发限制时返回的自定义错误消息。留空则使用系统默认消息。返回HTTP状态码503',
+                  )}
+                  field={'RateLimitExceededMessage'}
+                  autosize={{ minRows: 2, maxRows: 6 }}
+                  onChange={handleFieldChange('RateLimitExceededMessage')}
                 />
               </Col>
             </Row>

@@ -39,6 +39,7 @@ export default function RequestRateLimit(props) {
     ModelRequestRateLimitSuccessCount: 1000,
     ModelRequestRateLimitDurationMinutes: 1,
     ModelRequestRateLimitGroup: '',
+    RateLimitExceededMessage: '',
   });
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
@@ -225,6 +226,22 @@ export default function RequestRateLimit(props) {
                   }
                   onChange={(value) => {
                     setInputs({ ...inputs, ModelRequestRateLimitGroup: value });
+                  }}
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Col xs={24} sm={16}>
+                <Form.TextArea
+                  label={t('RPM/并发超限错误提示 (503)')}
+                  placeholder={t('留空使用默认消息')}
+                  extraText={t(
+                    '当用户超过分组RPM或并发限制时返回的自定义错误消息。留空则使用系统默认消息。返回HTTP状态码503',
+                  )}
+                  field={'RateLimitExceededMessage'}
+                  autosize={{ minRows: 2, maxRows: 6 }}
+                  onChange={(value) => {
+                    setInputs({ ...inputs, RateLimitExceededMessage: value });
                   }}
                 />
               </Col>

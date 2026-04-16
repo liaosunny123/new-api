@@ -126,6 +126,9 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.PUT("/", controller.UpdateUser)
 				adminRoute.DELETE("/:id", controller.DeleteUser)
 				adminRoute.DELETE("/:id/reset_passkey", controller.AdminResetPasskey)
+				adminRoute.GET("/:id/rate-limit-usage", controller.GetUserRateLimitUsage)
+				adminRoute.GET("/:id/rate-limit-overrides", controller.GetUserRateLimitOverrides)
+				adminRoute.PUT("/:id/rate-limit-overrides", controller.UpdateUserRateLimitOverrides)
 
 				// Admin 2FA routes
 				adminRoute.GET("/2fa/stats", controller.Admin2FAStats)
