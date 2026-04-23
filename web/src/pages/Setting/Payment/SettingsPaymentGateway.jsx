@@ -43,12 +43,25 @@ export default function SettingsPaymentGateway(props) {
     PayMethods: '',
     AmountOptions: '',
     AmountDiscount: '',
+    SingleTopUpLimitEnabled: false,
+    SingleTopUpLimitAmount: 0,
+    SingleTopUpLimitMessage: '',
+    DailyTopUpLimitEnabled: false,
+    DailyTopUpLimitAmount: 0,
+    DailyTopUpLimitMessage: '',
   });
   const [originInputs, setOriginInputs] = useState({});
+  const [singleLimitOn, setSingleLimitOn] = useState(false);
+  const [dailyLimitOn, setDailyLimitOn] = useState(false);
   const formApiRef = useRef(null);
 
   useEffect(() => {
     if (props.options && formApiRef.current) {
+      const singleEnabled = props.options.SingleTopUpLimitEnabled || false;
+      const dailyEnabled = props.options.DailyTopUpLimitEnabled || false;
+      setSingleLimitOn(singleEnabled);
+      setDailyLimitOn(dailyEnabled);
+
       const currentInputs = {
         PayAddress: props.options.PayAddress || '',
         EpayId: props.options.EpayId || '',
@@ -66,6 +79,12 @@ export default function SettingsPaymentGateway(props) {
         PayMethods: props.options.PayMethods || '',
         AmountOptions: props.options.AmountOptions || '',
         AmountDiscount: props.options.AmountDiscount || '',
+        SingleTopUpLimitEnabled: singleEnabled,
+        SingleTopUpLimitAmount: props.options.SingleTopUpLimitAmount || 0,
+        SingleTopUpLimitMessage: props.options.SingleTopUpLimitMessage || '',
+        DailyTopUpLimitEnabled: dailyEnabled,
+        DailyTopUpLimitAmount: props.options.DailyTopUpLimitAmount || 0,
+        DailyTopUpLimitMessage: props.options.DailyTopUpLimitMessage || '',
       };
 
       // 美化 JSON 展示
@@ -96,6 +115,12 @@ export default function SettingsPaymentGateway(props) {
 
   const handleFormChange = (values) => {
     setInputs(values);
+    if (values.SingleTopUpLimitEnabled !== singleLimitOn) {
+      setSingleLimitOn(values.SingleTopUpLimitEnabled);
+    }
+    if (values.DailyTopUpLimitEnabled !== dailyLimitOn) {
+      setDailyLimitOn(values.DailyTopUpLimitEnabled);
+    }
   };
 
   const submitPayAddress = async () => {
@@ -180,6 +205,31 @@ export default function SettingsPaymentGateway(props) {
           value: inputs.AmountDiscount,
         });
       }
+
+      options.push({
+        key: 'payment_setting.single_topup_limit_enabled',
+        value: String(inputs.SingleTopUpLimitEnabled),
+      });
+      options.push({
+        key: 'payment_setting.single_topup_limit_amount',
+        value: String(inputs.SingleTopUpLimitAmount || 0),
+      });
+      options.push({
+        key: 'payment_setting.single_topup_limit_message',
+        value: inputs.SingleTopUpLimitMessage || '',
+      });
+      options.push({
+        key: 'payment_setting.daily_topup_limit_enabled',
+        value: String(inputs.DailyTopUpLimitEnabled),
+      });
+      options.push({
+        key: 'payment_setting.daily_topup_limit_amount',
+        value: String(inputs.DailyTopUpLimitAmount || 0),
+      });
+      options.push({
+        key: 'payment_setting.daily_topup_limit_message',
+        value: inputs.DailyTopUpLimitMessage || '',
+      });
 
       // 发送请求
       const requestQueue = options.map((opt) =>
@@ -325,6 +375,60 @@ export default function SettingsPaymentGateway(props) {
           </Row>
 
           <Button onClick={submitPayAddress}>{t('更新支付设置')}</Button>
+        </Form.Section>
+
+        <Form.Section text={t('充值限额设置')}>
+          <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}>
+            <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+              <Form.Switch
+                field='SingleTopUpLimitEnabled'
+                label={t('启用单笔充值限额')}
+              />
+            </Col>
+            <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+              <Form.InputNumber
+                field='SingleTopUpLimitAmount'
+                label={t('单笔充值最大金额')}
+                placeholder={t('例如：1000')}
+                disabled={!singleLimitOn}
+                min={0}
+              />
+            </Col>
+          </Row>
+          <Form.TextArea
+            field='SingleTopUpLimitMessage'
+            label={t('单笔充值限额提示消息')}
+            placeholder={t('超出限额时显示的自定义消息')}
+            disabled={!singleLimitOn}
+            autosize
+          />
+
+          <Row gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }} style={{ marginTop: 16 }}>
+            <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+              <Form.Switch
+                field='DailyTopUpLimitEnabled'
+                label={t('启用每日充值限额')}
+              />
+            </Col>
+            <Col xs={24} sm={24} md={8} lg={8} xl={8}>
+              <Form.InputNumber
+                field='DailyTopUpLimitAmount'
+                label={t('每日充值最大金额')}
+                placeholder={t('例如：5000')}
+                disabled={!dailyLimitOn}
+                min={0}
+              />
+            </Col>
+          </Row>
+          <Form.TextArea
+            field='DailyTopUpLimitMessage'
+            label={t('每日充值限额提示消息')}
+            placeholder={t('超出限额时显示的自定义消息')}
+            disabled={!dailyLimitOn}
+            autosize
+          />
+
+          <Button onClick={submitPayAddress} style={{ marginTop: 16 }}>{t('更新支付设置')}</Button>
         </Form.Section>
       </Form>
     </Spin>

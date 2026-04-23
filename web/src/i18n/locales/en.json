@@ -3539,6 +3539,19 @@
     "该用户没有配置RPM/并发限制的分组": "No groups with RPM/concurrency limits configured for this user",
     "每分钟请求数": "Requests Per Minute",
     "并发数": "Concurrency",
-    "自定义覆盖": "Custom Override"
+    "自定义覆盖": "Custom Override",
+    "RPM / 并发限制": "RPM / Concurrency Limits",
+    "当前无 RPM/并发限制": "No RPM/concurrency limits configured",
+    "充值限额设置": "Top-Up Limit Settings",
+    "启用单笔充值限额": "Enable Single Top-Up Limit",
+    "单笔充值最大金额": "Max Single Top-Up Amount",
+    "单笔充值限额提示消息": "Single Top-Up Limit Message",
+    "超出限额时显示的自定义消息": "Custom message shown when limit is exceeded",
+    "启用每日充值限额": "Enable Daily Top-Up Limit",
+    "每日充值最大金额": "Max Daily Top-Up Amount",
+    "每日充值限额提示消息": "Daily Top-Up Limit Message",
+    "充值限额提示": "Top-Up Limit Notice",
+    "单次充值不能超过": "Single top-up amount cannot exceed",
+    "今日充值已达上限": "Daily top-up limit has been reached"
   }
 }

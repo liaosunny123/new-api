@@ -28,25 +28,37 @@ func GetUserRateLimitUsage(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
-
-	user, err := model.GetUserById(id, false)
+	data, err := getUserRateLimitUsageById(id)
 	if err != nil {
 		common.ApiError(c, err)
 		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": data})
+}
+
+func GetSelfRateLimitUsage(c *gin.Context) {
+	id := c.GetInt("id")
+	data, err := getUserRateLimitUsageById(id)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": data})
+}
+
+func getUserRateLimitUsageById(id int) (map[string]GroupRateLimitUsage, error) {
+	user, err := model.GetUserById(id, false)
+	if err != nil {
+		return nil, err
 	}
 
 	userSetting := user.GetSetting()
 	userGroup := user.Group
 
-	// Collect all groups the user can actually use (token group selection)
-	// plus any groups with configured rate limits for this user
 	candidateGroups := make(map[string]struct{})
-	// 1. User's usable groups (groups they can select when creating tokens)
 	for g := range service.GetUserUsableGroups(userGroup) {
 		candidateGroups[g] = struct{}{}
 	}
-	// 2. Groups that have rate limit configuration relevant to this user
-	//    (covers group-group limits, user overrides, etc.)
 	for g := range setting.GetAllGroupsWithRateLimits(userGroup, userSetting) {
 		candidateGroups[g] = struct{}{}
 	}
@@ -55,8 +67,6 @@ func GetUserRateLimitUsage(c *gin.Context) {
 
 	for groupName := range candidateGroups {
 		rpmLimit, concLimit := setting.ResolveRPMConcurrencyLimit(userGroup, groupName, userSetting)
-
-		// Only include groups that have limits
 		if rpmLimit <= 0 && concLimit <= 0 {
 			continue
 		}
@@ -68,22 +78,15 @@ func GetUserRateLimitUsage(c *gin.Context) {
 			RPMLimit:         rpmLimit,
 			ConcurrencyLimit: concLimit,
 		}
-
 		if rpmLimit > 0 {
-			usage.RPMCurrent = middleware.GetGroupRpmCount(rpmKey)
+			usage.RPMCurrent = middleware.GetSlidingWindowCount(rpmKey)
 		}
 		if concLimit > 0 {
-			usage.ConcurrencyCurrent = common.GlobalConcurrencyTracker.GetCurrentCount(concKey)
+			usage.ConcurrencyCurrent = middleware.GetSlidingWindowCount(concKey)
 		}
-
 		result[groupName] = usage
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
-		"data":    result,
-	})
+	return result, nil
 }
 
 func GetUserRateLimitOverrides(c *gin.Context) {

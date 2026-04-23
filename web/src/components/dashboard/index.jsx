@@ -28,6 +28,7 @@ import ChartsPanel from './ChartsPanel';
 import ApiInfoPanel from './ApiInfoPanel';
 import AnnouncementsPanel from './AnnouncementsPanel';
 import FaqPanel from './FaqPanel';
+import RateLimitPanel from './RateLimitPanel';
 import UptimePanel from './UptimePanel';
 import SearchModal from './modals/SearchModal';
 
@@ -216,6 +217,14 @@ const Dashboard = () => {
             />
           )}
         </div>
+      </div>
+
+      {/* RPM / 并发限制面板 */}
+      <div className='mb-4'>
+        <RateLimitPanel
+          CARD_PROPS={CARD_PROPS}
+          ILLUSTRATION_SIZE={ILLUSTRATION_SIZE}
+        />
       </div>
 
       {/* 系统公告和常见问答卡片 */}

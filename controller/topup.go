@@ -78,6 +78,7 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	ps := operation_setting.GetPaymentSetting()
 	data := gin.H{
 		"enable_online_topup": operation_setting.PayAddress != "" && operation_setting.EpayId != "" && operation_setting.EpayKey != "",
 		"enable_stripe_topup": setting.StripeApiSecret != "" && setting.StripeWebhookSecret != "" && setting.StripePriceId != "",
@@ -89,13 +90,24 @@ func GetTopUpInfo(c *gin.Context) {
 			}
 			return nil
 		}(),
-		"creem_products": setting.CreemProducts,
-		"pay_methods":         payMethods,
-		"min_topup":           operation_setting.MinTopUp,
-		"stripe_min_topup":    setting.StripeMinTopUp,
-		"waffo_min_topup":     setting.WaffoMinTopUp,
-		"amount_options":      operation_setting.GetPaymentSetting().AmountOptions,
-		"discount":            operation_setting.GetPaymentSetting().AmountDiscount,
+		"creem_products":        setting.CreemProducts,
+		"pay_methods":           payMethods,
+		"min_topup":             operation_setting.MinTopUp,
+		"stripe_min_topup":      setting.StripeMinTopUp,
+		"waffo_min_topup":       setting.WaffoMinTopUp,
+		"amount_options":        ps.AmountOptions,
+		"discount":              ps.AmountDiscount,
+		"single_topup_limit_enabled": ps.SingleTopUpLimitEnabled,
+		"single_topup_limit_amount":  ps.SingleTopUpLimitAmount,
+		"single_topup_limit_message": ps.SingleTopUpLimitMessage,
+		"daily_topup_limit_enabled":  ps.DailyTopUpLimitEnabled,
+		"daily_topup_limit_amount":   ps.DailyTopUpLimitAmount,
+		"daily_topup_limit_message":  ps.DailyTopUpLimitMessage,
+	}
+	if ps.DailyTopUpLimitEnabled {
+		userId := c.GetInt("id")
+		dailyUsed, _ := model.GetUserDailyTopUpAmount(userId)
+		data["daily_topup_used"] = dailyUsed
 	}
 	common.ApiSuccess(c, data)
 }
@@ -163,6 +175,39 @@ func getMinTopup() int64 {
 	return int64(minTopup)
 }
 
+func checkSingleTopUpLimit(amount int64) string {
+	ps := operation_setting.GetPaymentSetting()
+	if !ps.SingleTopUpLimitEnabled || ps.SingleTopUpLimitAmount <= 0 {
+		return ""
+	}
+	if float64(amount) > ps.SingleTopUpLimitAmount {
+		if ps.SingleTopUpLimitMessage != "" {
+			return ps.SingleTopUpLimitMessage
+		}
+		return fmt.Sprintf("单次充值不能超过 %.0f", ps.SingleTopUpLimitAmount)
+	}
+	return ""
+}
+
+func checkDailyTopUpLimit(userId int) string {
+	ps := operation_setting.GetPaymentSetting()
+	if !ps.DailyTopUpLimitEnabled || ps.DailyTopUpLimitAmount <= 0 {
+		return ""
+	}
+	dailyTotal, err := model.GetUserDailyTopUpAmount(userId)
+	if err != nil {
+		log.Printf("检查每日充值限额失败: %v", err)
+		return ""
+	}
+	if float64(dailyTotal) >= ps.DailyTopUpLimitAmount {
+		if ps.DailyTopUpLimitMessage != "" {
+			return ps.DailyTopUpLimitMessage
+		}
+		return fmt.Sprintf("今日充值已达上限 %.0f", ps.DailyTopUpLimitAmount)
+	}
+	return ""
+}
+
 func RequestEpay(c *gin.Context) {
 	var req EpayRequest
 	err := c.ShouldBindJSON(&req)
@@ -174,8 +219,16 @@ func RequestEpay(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "error", "data": fmt.Sprintf("充值数量不能小于 %d", getMinTopup())})
 		return
 	}
+	if msg := checkSingleTopUpLimit(req.Amount); msg != "" {
+		c.JSON(200, gin.H{"message": "error", "data": msg})
+		return
+	}
 
 	id := c.GetInt("id")
+	if msg := checkDailyTopUpLimit(id); msg != "" {
+		c.JSON(200, gin.H{"message": "error", "data": msg})
+		return
+	}
 	group, err := model.GetUserGroup(id, true)
 	if err != nil {
 		c.JSON(200, gin.H{"message": "error", "data": "获取用户分组失败"})

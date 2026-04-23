@@ -110,6 +110,13 @@ const TopUp = () => {
   const [topupInfo, setTopupInfo] = useState({
     amount_options: [],
     discount: {},
+    single_topup_limit_enabled: false,
+    single_topup_limit_amount: 0,
+    single_topup_limit_message: '',
+    daily_topup_limit_enabled: false,
+    daily_topup_limit_amount: 0,
+    daily_topup_limit_message: '',
+    daily_topup_used: 0,
   });
 
   const topUp = async () => {
@@ -156,7 +163,33 @@ const TopUp = () => {
     window.open(topUpLink, '_blank');
   };
 
+  const checkTopUpLimits = (amount) => {
+    if (topupInfo.single_topup_limit_enabled && topupInfo.single_topup_limit_amount > 0) {
+      if (amount > topupInfo.single_topup_limit_amount) {
+        Modal.warning({
+          title: t('充值限额提示'),
+          content: topupInfo.single_topup_limit_message || t('单次充值不能超过') + ' ' + topupInfo.single_topup_limit_amount,
+          centered: true,
+        });
+        return false;
+      }
+    }
+    if (topupInfo.daily_topup_limit_enabled && topupInfo.daily_topup_limit_amount > 0) {
+      if (topupInfo.daily_topup_used >= topupInfo.daily_topup_limit_amount) {
+        Modal.warning({
+          title: t('充值限额提示'),
+          content: topupInfo.daily_topup_limit_message || t('今日充值已达上限'),
+          centered: true,
+        });
+        return false;
+      }
+    }
+    return true;
+  };
+
   const preTopUp = async (payment) => {
+    if (!checkTopUpLimits(topUpCount)) return;
+
     if (payment === 'stripe') {
       if (!enableStripeTopUp) {
         showError(t('管理员未开启Stripe充值！'));
@@ -271,6 +304,8 @@ const TopUp = () => {
   };
 
   const creemPreTopUp = async (product) => {
+    if (!checkTopUpLimits(product.quota)) return;
+
     if (!enableCreemTopUp) {
       showError(t('管理员未开启 Creem 充值！'));
       return;
@@ -316,6 +351,8 @@ const TopUp = () => {
   };
 
   const waffoTopUp = async (payMethodIndex) => {
+    if (!checkTopUpLimits(topUpCount)) return;
+
     try {
         if (topUpCount < waffoMinTopUp) {
             showError(t('充值数量不能小于') + waffoMinTopUp);
@@ -425,6 +462,13 @@ const TopUp = () => {
         setTopupInfo({
           amount_options: data.amount_options || [],
           discount: data.discount || {},
+          single_topup_limit_enabled: data.single_topup_limit_enabled || false,
+          single_topup_limit_amount: data.single_topup_limit_amount || 0,
+          single_topup_limit_message: data.single_topup_limit_message || '',
+          daily_topup_limit_enabled: data.daily_topup_limit_enabled || false,
+          daily_topup_limit_amount: data.daily_topup_limit_amount || 0,
+          daily_topup_limit_message: data.daily_topup_limit_message || '',
+          daily_topup_used: data.daily_topup_used || 0,
         });
 
         // 处理支付方式

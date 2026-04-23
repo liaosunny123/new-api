@@ -42,6 +42,13 @@ const PaymentSetting = () => {
     AmountOptions: '',
     AmountDiscount: '',
 
+    SingleTopUpLimitEnabled: false,
+    SingleTopUpLimitAmount: 0,
+    SingleTopUpLimitMessage: '',
+    DailyTopUpLimitEnabled: false,
+    DailyTopUpLimitAmount: 0,
+    DailyTopUpLimitMessage: '',
+
     StripeApiSecret: '',
     StripeWebhookSecret: '',
     StripePriceId: '',
@@ -91,6 +98,24 @@ const PaymentSetting = () => {
             } catch (error) {
               newInputs['AmountDiscount'] = item.value;
             }
+            break;
+          case 'payment_setting.single_topup_limit_enabled':
+            newInputs['SingleTopUpLimitEnabled'] = item.value === 'true';
+            break;
+          case 'payment_setting.single_topup_limit_amount':
+            newInputs['SingleTopUpLimitAmount'] = parseFloat(item.value) || 0;
+            break;
+          case 'payment_setting.single_topup_limit_message':
+            newInputs['SingleTopUpLimitMessage'] = item.value;
+            break;
+          case 'payment_setting.daily_topup_limit_enabled':
+            newInputs['DailyTopUpLimitEnabled'] = item.value === 'true';
+            break;
+          case 'payment_setting.daily_topup_limit_amount':
+            newInputs['DailyTopUpLimitAmount'] = parseFloat(item.value) || 0;
+            break;
+          case 'payment_setting.daily_topup_limit_message':
+            newInputs['DailyTopUpLimitMessage'] = item.value;
             break;
           case 'Price':
           case 'MinTopUp':

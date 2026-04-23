@@ -78,6 +78,16 @@ func (*StripeAdaptor) RequestPay(c *gin.Context, req *StripePayRequest) {
 		c.JSON(200, gin.H{"message": "充值数量不能大于 10000", "data": 10})
 		return
 	}
+	if msg := checkSingleTopUpLimit(req.Amount); msg != "" {
+		c.JSON(200, gin.H{"message": "error", "data": msg})
+		return
+	}
+
+	id := c.GetInt("id")
+	if msg := checkDailyTopUpLimit(id); msg != "" {
+		c.JSON(200, gin.H{"message": "error", "data": msg})
+		return
+	}
 
 	if req.SuccessURL != "" && common.ValidateRedirectURL(req.SuccessURL) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "支付成功重定向URL不在可信任域名列表中", "data": ""})
@@ -89,7 +99,6 @@ func (*StripeAdaptor) RequestPay(c *gin.Context, req *StripePayRequest) {
 		return
 	}
 
-	id := c.GetInt("id")
 	user, _ := model.GetUserById(id, false)
 	chargedMoney := GetChargedAmount(float64(req.Amount), *user)
 

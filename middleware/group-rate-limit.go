@@ -48,12 +48,11 @@ func GroupRateLimit() func(c *gin.Context) {
 			return
 		}
 
-		// Check Concurrency first (does not consume a slot until acquired)
-		var concRelease func()
+		// Check Concurrency (sliding window, success-only)
+		var concKey string
 		if concurrencyLimit > 0 {
-			concKey := fmt.Sprintf("%s%d:%s", groupConcurrencyKeyPrefix, userId, usingGroup)
-			allowed, release := common.GlobalConcurrencyTracker.Acquire(concKey, concurrencyLimit)
-			if !allowed {
+			concKey = fmt.Sprintf("%s%d:%s", groupConcurrencyKeyPrefix, userId, usingGroup)
+			if !checkSlidingWindow(concKey, concurrencyLimit) {
 				msg := setting.RateLimitExceededMessage
 				if msg == "" {
 					msg = fmt.Sprintf("当前分组 %s 并发请求超限（并发上限: %d），请稍后再试", usingGroup, concurrencyLimit)
@@ -62,22 +61,16 @@ func GroupRateLimit() func(c *gin.Context) {
 				abortWithOpenAiMessage(c, http.StatusServiceUnavailable, msg)
 				return
 			}
-			concRelease = release
-			defer concRelease()
 		}
 
-		// Check RPM (check only, do not record yet)
+		// Check RPM (sliding window, success-only)
 		var rpmKey string
 		if rpmLimit > 0 {
 			rpmKey = fmt.Sprintf("%s%d:%s", groupRpmKeyPrefix, userId, usingGroup)
-			if !checkGroupRpm(rpmKey, rpmLimit) {
+			if !checkSlidingWindow(rpmKey, rpmLimit) {
 				msg := setting.RateLimitExceededMessage
 				if msg == "" {
 					msg = fmt.Sprintf("当前分组 %s 请求速率超限（RPM上限: %d），请稍后再试", usingGroup, rpmLimit)
-				}
-				// Release concurrency slot before aborting
-				if concRelease != nil {
-					concRelease()
 				}
 				recordRateLimitLog(c, userId, usingGroup, msg)
 				abortWithOpenAiMessage(c, http.StatusServiceUnavailable, msg)
@@ -87,28 +80,44 @@ func GroupRateLimit() func(c *gin.Context) {
 
 		c.Next()
 
-		// Record RPM only on successful response (status < 400)
-		if rpmLimit > 0 && c.Writer.Status() < 400 {
-			recordGroupRpm(rpmKey, rpmLimit)
+		// Record only on successful response (status < 400)
+		if c.Writer.Status() < 400 {
+			if rpmLimit > 0 {
+				recordSlidingWindow(rpmKey)
+			}
+			if concurrencyLimit > 0 {
+				recordSlidingWindow(concKey)
+			}
 		}
 	}
 }
 
-func checkGroupRpm(key string, limit int) bool {
+// ---- Shared sliding window (60s) used by both RPM and concurrency ----
+
+func checkSlidingWindow(key string, limit int) bool {
 	if common.RedisEnabled {
-		return checkGroupRpmRedis(key, limit)
+		ctx := context.Background()
+		length := cleanExpiredEntries(ctx, common.RDB, key)
+		return length < int64(limit)
 	}
-	return checkGroupRpmMemory(key, limit)
+	inMemoryRateLimiter.Init(2 * time.Minute)
+	return inMemoryRateLimiter.Check(key, limit, 60)
 }
 
-func checkGroupRpmRedis(key string, limit int) bool {
-	ctx := context.Background()
-	length := cleanExpiredEntries(ctx, common.RDB, key)
-	return length < int64(limit)
+func recordSlidingWindow(key string) {
+	if common.RedisEnabled {
+		ctx := context.Background()
+		now := time.Now().Format(timeFormat)
+		common.RDB.LPush(ctx, key, now)
+		common.RDB.Expire(ctx, key, 2*time.Minute)
+	} else {
+		inMemoryRateLimiter.Init(2 * time.Minute)
+		// limit=0 here just to record; actual limiting is done in checkSlidingWindow
+		inMemoryRateLimiter.Request(key, 1<<30, 60)
+	}
 }
 
 // Lua script: remove expired entries from list tail and return remaining length.
-// Single round-trip to Redis regardless of how many entries are expired.
 var cleanAndCountScript = redis.NewScript(`
 local key = KEYS[1]
 local cutoff = ARGV[1]
@@ -124,8 +133,6 @@ end
 return redis.call('LLEN', key)
 `)
 
-// cleanExpiredEntries removes entries older than 60 seconds from the tail
-// and returns the remaining list length. Single Redis round-trip via Lua.
 func cleanExpiredEntries(ctx context.Context, rdb *redis.Client, key string) int64 {
 	cutoff := time.Now().Add(-60 * time.Second).Format(timeFormat)
 	result, err := cleanAndCountScript.Run(ctx, rdb, []string{key}, cutoff).Int64()
@@ -133,28 +140,6 @@ func cleanExpiredEntries(ctx context.Context, rdb *redis.Client, key string) int
 		return 0
 	}
 	return result
-}
-
-func checkGroupRpmMemory(key string, limit int) bool {
-	inMemoryRateLimiter.Init(2 * time.Minute)
-	return inMemoryRateLimiter.Check(key, limit, 60)
-}
-
-func recordGroupRpm(key string, limit int) {
-	if common.RedisEnabled {
-		recordGroupRpmRedis(key, limit)
-	} else {
-		inMemoryRateLimiter.Init(2 * time.Minute)
-		inMemoryRateLimiter.Request(key, limit, 60)
-	}
-}
-
-func recordGroupRpmRedis(key string, limit int) {
-	ctx := context.Background()
-	rdb := common.RDB
-	now := time.Now().Format(timeFormat)
-	rdb.LPush(ctx, key, now)
-	rdb.Expire(ctx, key, 2*time.Minute)
 }
 
 func recordRateLimitLog(c *gin.Context, userId int, group string, content string) {
@@ -166,8 +151,8 @@ func recordRateLimitLog(c *gin.Context, userId int, group string, content string
 	})
 }
 
-// GetGroupRpmCount returns current RPM count for the given key
-func GetGroupRpmCount(key string) int64 {
+// GetSlidingWindowCount returns the current count within the 60s window for a key
+func GetSlidingWindowCount(key string) int64 {
 	if common.RedisEnabled {
 		ctx := context.Background()
 		return cleanExpiredEntries(ctx, common.RDB, key)

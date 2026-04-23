@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -448,4 +449,15 @@ func RechargeWaffo(tradeNo string) (err error) {
 	}
 
 	return nil
+}
+
+func GetUserDailyTopUpAmount(userId int) (int64, error) {
+	startOfDay := time.Now().UTC().Truncate(24 * time.Hour).Unix()
+	var totalAmount int64
+	err := DB.Model(&TopUp{}).
+		Where("user_id = ? AND status = ? AND create_time >= ?",
+			userId, common.TopUpStatusSuccess, startOfDay).
+		Select("COALESCE(SUM(amount), 0)").
+		Scan(&totalAmount).Error
+	return totalAmount, err
 }

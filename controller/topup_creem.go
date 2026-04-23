@@ -98,8 +98,16 @@ func (*CreemAdaptor) RequestPay(c *gin.Context, req *CreemPayRequest) {
 		c.JSON(200, gin.H{"message": "error", "data": "产品不存在"})
 		return
 	}
+	if msg := checkSingleTopUpLimit(selectedProduct.Quota); msg != "" {
+		c.JSON(200, gin.H{"message": "error", "data": msg})
+		return
+	}
 
 	id := c.GetInt("id")
+	if msg := checkDailyTopUpLimit(id); msg != "" {
+		c.JSON(200, gin.H{"message": "error", "data": msg})
+		return
+	}
 	user, _ := model.GetUserById(id, false)
 
 	// 生成唯一的订单引用ID
