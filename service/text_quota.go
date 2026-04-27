@@ -106,6 +106,15 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	summary.PromptTokens = usage.PromptTokens
 	summary.CompletionTokens = usage.CompletionTokens
 	summary.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+
+	if summary.TotalTokens == 0 && relayInfo.IsStream && relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsClientGone() {
+		estimatedPrompt := relayInfo.GetEstimatePromptTokens()
+		if estimatedPrompt > 0 {
+			summary.PromptTokens = estimatedPrompt
+			summary.TotalTokens = estimatedPrompt
+		}
+	}
+
 	summary.CacheTokens = usage.PromptTokensDetails.CachedTokens
 	summary.CacheCreationTokens = usage.PromptTokensDetails.CachedCreationTokens
 	summary.CacheCreationTokens5m = usage.ClaudeCacheCreation5mTokens
@@ -273,7 +282,13 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	}
 
 	if summary.TotalTokens == 0 {
-		summary.Quota = 0
+		if relayInfo.IsStream && relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsClientGone() {
+			if !ratio.IsZero() && summary.Quota == 0 {
+				summary.Quota = 1
+			}
+		} else {
+			summary.Quota = 0
+		}
 	} else if !ratio.IsZero() && summary.Quota == 0 {
 		summary.Quota = 1
 	}
@@ -319,10 +334,15 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		extraContent = append(extraContent, fmt.Sprintf("Image Generation Call 花费 %s", decimal.NewFromFloat(summary.ImageGenerationCallPrice).Mul(decimal.NewFromFloat(summary.GroupRatio)).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).String()))
 	}
 
-	if summary.TotalTokens == 0 {
+	isClientGone := relayInfo.IsStream && relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsClientGone()
+
+	if summary.TotalTokens == 0 && !isClientGone {
 		extraContent = append(extraContent, "上游没有返回计费信息，无法扣费（可能是上游超时）")
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, summary.ModelName, relayInfo.FinalPreConsumedQuota))
 	} else {
+		if isClientGone {
+			extraContent = append(extraContent, fmt.Sprintf("客户端主动断开连接，按已接收内容计费 (prompt: %d, completion: %d)", summary.PromptTokens, summary.CompletionTokens))
+		}
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, summary.Quota)
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
 	}

@@ -94,6 +94,13 @@ func (s *StreamStatus) IsNormalEnd() bool {
 		s.EndReason == StreamEndReasonHandlerStop
 }
 
+func (s *StreamStatus) IsClientGone() bool {
+	if s == nil {
+		return false
+	}
+	return s.EndReason == StreamEndReasonClientGone
+}
+
 func (s *StreamStatus) Summary() string {
 	if s == nil {
 		return "StreamStatus<nil>"
