@@ -25,6 +25,10 @@ var defaultGroupGroupRatio = map[string]map[string]float64{
 
 var groupGroupRatioMap = types.NewRWMap[string, map[string]float64]()
 
+// groupAllowMainlandMap stores, per group, whether mainland China users are allowed to use it.
+// Absent entry => allowed (default true). This is a frontend-only gate; the backend keeps serving.
+var groupAllowMainlandMap = types.NewRWMap[string, bool]()
+
 var defaultGroupSpecialUsableGroup = map[string]map[string]string{
 	"vip": {
 		"append_1":   "vip_special_group_1",
@@ -108,6 +112,26 @@ func GroupGroupRatio2JSONString() string {
 
 func UpdateGroupGroupRatioByJSONString(jsonStr string) error {
 	return types.LoadFromJsonString(groupGroupRatioMap, jsonStr)
+}
+
+// AllowMainlandForGroup reports whether mainland China users are allowed to use the given group.
+// Unknown/unset groups default to allowed.
+func AllowMainlandForGroup(name string) bool {
+	allow, ok := groupAllowMainlandMap.Get(name)
+	if !ok {
+		return true
+	}
+	return allow
+}
+
+// GroupAllowMainland2JSONString serializes the per-group mainland-allow map.
+func GroupAllowMainland2JSONString() string {
+	return groupAllowMainlandMap.MarshalJSONString()
+}
+
+// UpdateGroupAllowMainlandByJSONString loads the per-group mainland-allow map from JSON.
+func UpdateGroupAllowMainlandByJSONString(jsonStr string) error {
+	return types.LoadFromJsonString(groupAllowMainlandMap, jsonStr)
 }
 
 func CheckGroupRatio(jsonStr string) error {

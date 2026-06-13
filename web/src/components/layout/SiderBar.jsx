@@ -49,6 +49,8 @@ const routerMap = {
   deployment: '/console/deployment',
   playground: '/console/playground',
   personal: '/console/personal',
+  ticket: '/console/ticket',
+  adminTicket: '/console/admin-ticket',
 };
 
 const SiderBar = ({ onNavigate = () => {} }) => {
@@ -104,6 +106,11 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         to: '/task',
         className:
           localStorage.getItem('enable_task') === 'true' ? '' : 'tableHiddle',
+      },
+      {
+        text: t('工单'),
+        itemKey: 'ticket',
+        to: '/ticket',
       },
     ];
 
@@ -181,6 +188,12 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         text: t('用户管理'),
         itemKey: 'user',
         to: '/user',
+        className: isAdmin() ? '' : 'tableHiddle',
+      },
+      {
+        text: t('工单管理'),
+        itemKey: 'adminTicket',
+        to: '/console/admin-ticket',
         className: isAdmin() ? '' : 'tableHiddle',
       },
       {

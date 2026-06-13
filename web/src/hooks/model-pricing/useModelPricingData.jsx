@@ -23,9 +23,11 @@ import { API, copy, showError, showInfo, showSuccess } from '../../helpers';
 import { Modal } from '@douyinfe/semi-ui';
 import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
+import { useRegion } from '../common/useRegion';
 
 export const useModelPricingData = () => {
   const { t } = useTranslation();
+  const { isMainland } = useRegion();
   const [searchValue, setSearchValue] = useState('');
   const compositionRef = useRef({ isComposition: false });
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
@@ -49,6 +51,7 @@ export const useModelPricingData = () => {
   const [loading, setLoading] = useState(true);
   const [groupRatio, setGroupRatio] = useState({});
   const [usableGroup, setUsableGroup] = useState({});
+  const [groupAllowMainland, setGroupAllowMainland] = useState({});
   const [endpointMap, setEndpointMap] = useState({});
   const [autoGroups, setAutoGroups] = useState([]);
 
@@ -56,6 +59,17 @@ export const useModelPricingData = () => {
   const [userState] = useContext(UserContext);
 
   // 充值汇率（price）与美元兑人民币汇率（usd_exchange_rate）
+  // Hide groups that disallow mainland China users when the visitor is in mainland China.
+  const visibleUsableGroup = useMemo(() => {
+    if (!isMainland) return usableGroup;
+    const out = {};
+    Object.entries(usableGroup || {}).forEach(([k, v]) => {
+      if (groupAllowMainland[k] === false) return;
+      out[k] = v;
+    });
+    return out;
+  }, [usableGroup, groupAllowMainland, isMainland]);
+
   const priceRate = useMemo(
     () => statusState?.status?.price ?? 1,
     [statusState],
@@ -236,12 +250,14 @@ export const useModelPricingData = () => {
       vendors,
       group_ratio,
       usable_group,
+      group_allow_mainland,
       supported_endpoint,
       auto_groups,
     } = res.data;
     if (success) {
       setGroupRatio(group_ratio);
       setUsableGroup(usable_group);
+      setGroupAllowMainland(group_allow_mainland || {});
       setSelectedGroup('all');
       // 构建供应商 Map 方便查找
       const vendorMap = {};
@@ -371,7 +387,7 @@ export const useModelPricingData = () => {
     models,
     loading,
     groupRatio,
-    usableGroup,
+    usableGroup: visibleUsableGroup,
     endpointMap,
     autoGroups,
 

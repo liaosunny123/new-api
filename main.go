@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/common/geoip"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/i18n"
@@ -50,6 +51,8 @@ func main() {
 	}
 
 	common.SysLog("New API " + common.Version + " started")
+	// Load GeoIP database for region-based group gating (non-fatal if absent).
+	geoip.EnsureLoaded()
 	if os.Getenv("GIN_MODE") != "debug" {
 		gin.SetMode(gin.ReleaseMode)
 	}

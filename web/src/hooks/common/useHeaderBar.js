@@ -153,6 +153,9 @@ export const useHeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
       const previousLang = normalizeLanguage(i18n.language);
       i18n.changeLanguage(lang);
       localStorage.setItem('i18nextLng', lang);
+      // Mark this as an explicit user choice so the site default language
+      // (for new visitors) no longer overrides it.
+      localStorage.setItem('lang_explicit', '1');
 
       // If user is logged in, save preference to backend
       if (userState?.user?.id) {

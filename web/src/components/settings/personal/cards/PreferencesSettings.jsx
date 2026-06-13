@@ -74,6 +74,7 @@ const PreferencesSettings = ({ t }) => {
 			setCurrentLanguage(lang);
 			i18n.changeLanguage(lang);
 			localStorage.setItem('i18nextLng', lang);
+			localStorage.setItem('lang_explicit', '1');
 
 			// Save to backend
 			const res = await API.put("/api/user/self", {

@@ -43,7 +43,7 @@ const { Sider, Content, Header } = Layout;
 
 const PageLayout = () => {
   const [userState, userDispatch] = useContext(UserContext);
-  const [, statusDispatch] = useContext(StatusContext);
+  const [statusState, statusDispatch] = useContext(StatusContext);
   const isMobile = useIsMobile();
   const [collapsed, , setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -120,6 +120,7 @@ const PageLayout = () => {
   useEffect(() => {
     let preferredLang;
 
+    // 1. A logged-in user's saved language preference always wins.
     if (userState?.user?.setting) {
       try {
         const settings = JSON.parse(userState.user.setting);
@@ -129,6 +130,24 @@ const PageLayout = () => {
       }
     }
 
+    // 2. An explicit (manual) choice by an anonymous visitor is preserved.
+    if (!preferredLang && localStorage.getItem('lang_explicit') === '1') {
+      const savedLang = localStorage.getItem('i18nextLng');
+      if (savedLang) {
+        preferredLang = normalizeLanguage(savedLang);
+      }
+    }
+
+    // 3. Otherwise, for new visitors who haven't chosen, apply the
+    //    admin-configured site default language (replacing browser auto-detect).
+    if (!preferredLang) {
+      const siteDefault = statusState?.status?.default_site_language;
+      if (siteDefault) {
+        preferredLang = normalizeLanguage(siteDefault);
+      }
+    }
+
+    // 4. Final fallback to whatever was already cached/detected.
     if (!preferredLang) {
       const savedLang = localStorage.getItem('i18nextLng');
       if (savedLang) {
@@ -142,7 +161,11 @@ const PageLayout = () => {
         i18n.changeLanguage(preferredLang);
       }
     }
-  }, [i18n, userState?.user?.setting]);
+  }, [
+    i18n,
+    userState?.user?.setting,
+    statusState?.status?.default_site_language,
+  ]);
 
   return (
     <Layout

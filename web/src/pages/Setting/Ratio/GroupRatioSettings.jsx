@@ -49,6 +49,7 @@ import GroupGroupRatioRules from './components/GroupGroupRatioRules';
 import GroupSpecialUsableRules from './components/GroupSpecialUsableRules';
 import GroupRateLimitRules from './components/GroupRateLimitRules';
 import GroupGroupRateLimitRules from './components/GroupGroupRateLimitRules';
+import GroupRegionRestriction from './components/GroupRegionRestriction';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -61,6 +62,7 @@ const OPTION_KEYS = [
   'DefaultUseAutoGroup',
   'GroupRPMConcurrencyLimit',
   'GroupGroupRPMConcurrencyLimit',
+  'GroupAllowMainlandChina',
 ];
 
 function parseJSONSafe(str, fallback) {
@@ -87,6 +89,7 @@ export default function GroupRatioSettings(props) {
     DefaultUseAutoGroup: false,
     GroupRPMConcurrencyLimit: '',
     GroupGroupRPMConcurrencyLimit: '',
+    GroupAllowMainlandChina: '',
   });
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
@@ -190,6 +193,10 @@ export default function GroupRatioSettings(props) {
     setInputs((prev) => ({ ...prev, GroupGroupRPMConcurrencyLimit: value }));
   }, []);
 
+  const handleGroupAllowMainlandChange = useCallback((value) => {
+    setInputs((prev) => ({ ...prev, GroupAllowMainlandChina: value }));
+  }, []);
+
   const dv = dataVersionRef.current;
 
   const renderVisualMode = () => (
@@ -286,6 +293,15 @@ export default function GroupRatioSettings(props) {
           value={inputs.GroupGroupRPMConcurrencyLimit}
           groupNames={groupNames}
           onChange={handleGroupGroupRateLimitChange}
+        />
+      </Form.Section>
+
+      <Form.Section text={t('分组地区限制')}>
+        <GroupRegionRestriction
+          key={`grr_${dv}`}
+          value={inputs.GroupAllowMainlandChina}
+          groupNames={groupNames}
+          onChange={handleGroupAllowMainlandChange}
         />
       </Form.Section>
     </Form>
