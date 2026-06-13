@@ -33,6 +33,9 @@ RUN apt-get update \
     && update-ca-certificates
 
 COPY --from=builder2 /build/new-api /
+# Ship the GeoLite2 database for region detection (/api/region group gating).
+COPY --from=builder2 /build/geo /geo
+ENV GEOIP_DB_PATH=/geo/GeoLite2-Country.mmdb
 EXPOSE 3000
 WORKDIR /data
 ENTRYPOINT ["/new-api"]
