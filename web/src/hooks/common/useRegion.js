@@ -20,36 +20,34 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useState } from 'react';
 import { API } from '../../helpers';
 
-const CACHE_KEY = 'region_info';
-
-// In-memory promise so multiple hook consumers share a single request per page load.
+// In-memory promise so multiple hook consumers share a single request per page
+// load. Intentionally NOT persisted to sessionStorage/localStorage: a stale
+// "not mainland" result (e.g. cached before the GeoIP DB was deployed) must not
+// survive across reloads/redeploys. A full page reload re-fetches.
 let regionPromise = null;
 
+// Clean up the legacy persistent cache key (previously stored a possibly-stale
+// region result). Safe no-op if absent.
+try {
+  sessionStorage.removeItem('region_info');
+} catch (e) {
+  // ignore
+}
+
 const fetchRegion = async () => {
-  // Session cache to avoid repeated lookups while navigating.
-  try {
-    const cached = sessionStorage.getItem(CACHE_KEY);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-  } catch (e) {
-    // ignore
-  }
   if (!regionPromise) {
     regionPromise = API.get('/api/region')
       .then((res) => {
         const { success, data } = res.data;
-        const info = success
+        return success
           ? { country: data.country || '', isMainland: !!data.is_mainland }
           : { country: '', isMainland: false };
-        try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify(info));
-        } catch (e) {
-          // ignore
-        }
-        return info;
       })
-      .catch(() => ({ country: '', isMainland: false }));
+      .catch(() => {
+        // Reset so a transient failure can be retried on the next consumer.
+        regionPromise = null;
+        return { country: '', isMainland: false };
+      });
   }
   return regionPromise;
 };
