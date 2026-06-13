@@ -33,6 +33,8 @@ import PasswordResetForm from './components/auth/PasswordResetForm';
 import PasswordResetConfirm from './components/auth/PasswordResetConfirm';
 import Channel from './pages/Channel';
 import Token from './pages/Token';
+import Ticket from './pages/Ticket';
+import AdminTicket from './pages/Ticket/Admin';
 import Redemption from './pages/Redemption';
 import TopUp from './pages/TopUp';
 import Log from './pages/Log';
@@ -153,6 +155,22 @@ function App() {
             <PrivateRoute>
               <Playground />
             </PrivateRoute>
+          }
+        />
+        <Route
+          path='/console/ticket'
+          element={
+            <PrivateRoute>
+              <Ticket />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path='/console/admin-ticket'
+          element={
+            <AdminRoute>
+              <AdminTicket />
+            </AdminRoute>
           }
         />
         <Route

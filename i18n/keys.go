@@ -318,6 +318,18 @@ const (
 	MsgDistributorInvalidParseModel   = "distributor.invalid_request_parse_model"
 )
 
+// Ticket related messages
+const (
+	MsgTicketTitleEmpty      = "ticket.title_empty"
+	MsgTicketContentEmpty    = "ticket.content_empty"
+	MsgTicketInvalidPriority = "ticket.invalid_priority"
+	MsgTicketDailyLimit      = "ticket.daily_limit"
+	MsgTicketNotFound        = "ticket.not_found"
+	MsgTicketNoPermission    = "ticket.no_permission"
+	MsgTicketReplyEmpty      = "ticket.reply_empty"
+	MsgTicketInvalidStatus   = "ticket.invalid_status"
+)
+
 // Custom OAuth provider related messages
 const (
 	MsgCustomOAuthNotFound          = "custom_oauth.not_found"

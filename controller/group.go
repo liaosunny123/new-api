@@ -33,8 +33,9 @@ func GetUserGroups(c *gin.Context) {
 		// UserUsableGroups contains the groups that the user can use
 		if desc, ok := userUsableGroups[groupName]; ok {
 			usableGroups[groupName] = map[string]interface{}{
-				"ratio": service.GetUserGroupRatio(userGroup, groupName),
-				"desc":  desc,
+				"ratio":          service.GetUserGroupRatio(userGroup, groupName),
+				"desc":           desc,
+				"allow_mainland": ratio_setting.AllowMainlandForGroup(groupName),
 			}
 		}
 	}

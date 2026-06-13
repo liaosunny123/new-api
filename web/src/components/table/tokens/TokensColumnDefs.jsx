@@ -88,7 +88,31 @@ const renderStatus = (text, record, t) => {
 };
 
 // Render group column
-const renderGroupColumn = (text, record, t, groupRatios = {}) => {
+const renderGroupColumn = (
+  text,
+  record,
+  t,
+  groupRatios = {},
+  restrictedGroups = new Set(),
+) => {
+  if (restrictedGroups && restrictedGroups.has(text)) {
+    return (
+      <div className='flex flex-col gap-0.5'>
+        <div className='semi-space semi-space-align-center semi-space-horizontal' style={{ gap: '4px' }}>
+          <span>{renderGroup(text)}</span>
+          <Tag color='orange' shape='circle' size='small'>
+            {t('无可用渠道')}
+          </Tag>
+        </div>
+        <span
+          className='semi-typography semi-typography-secondary semi-typography-normal'
+          style={{ fontSize: '12px' }}
+        >
+          {t('此地区无法访问该模型')}
+        </span>
+      </div>
+    );
+  }
   if (text === 'auto') {
     return (
       <Tooltip
@@ -480,6 +504,7 @@ export const getTokensColumns = ({
   setShowEdit,
   refresh,
   groupRatios = {},
+  restrictedGroups = new Set(),
 }) => {
   return [
     {
@@ -501,7 +526,8 @@ export const getTokensColumns = ({
       title: t('分组'),
       dataIndex: 'group',
       key: 'group',
-      render: (text, record) => renderGroupColumn(text, record, t, groupRatios),
+      render: (text, record) =>
+        renderGroupColumn(text, record, t, groupRatios, restrictedGroups),
     },
     {
       title: t('密钥'),

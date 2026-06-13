@@ -56,6 +56,7 @@ import {
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { StatusContext } from '../../../../context/Status';
+import { useRegion } from '../../../../hooks/common/useRegion';
 
 const { Text, Title } = Typography;
 
@@ -67,6 +68,7 @@ const EditTokenModal = (props) => {
   const formApiRef = useRef(null);
   const [models, setModels] = useState([]);
   const [groups, setGroups] = useState([]);
+  const { isMainland } = useRegion();
   const [showQuotaInput, setShowQuotaInput] = useState(false);
   const isEdit = props.editingToken.id !== undefined;
 
@@ -133,28 +135,35 @@ const EditTokenModal = (props) => {
     }
   };
 
+  const [rawGroupData, setRawGroupData] = useState({});
+
   const loadGroups = async () => {
     let res = await API.get(`/api/user/self/groups`);
     const { success, message, data } = res.data;
     if (success) {
-      let localGroupOptions = Object.entries(data).map(([group, info]) => ({
-        label: info.desc,
-        value: group,
-        ratio: info.ratio,
-      }));
-      if (statusState?.status?.default_use_auto_group) {
-        if (localGroupOptions.some((group) => group.value === 'auto')) {
-          localGroupOptions.sort((a, b) => (a.value === 'auto' ? -1 : 1));
-        }
-      }
-      setGroups(localGroupOptions);
-      // if (statusState?.status?.default_use_auto_group && formApiRef.current) {
-      //   formApiRef.current.setValue('group', 'auto');
-      // }
+      setRawGroupData(data || {});
     } else {
       showError(t(message));
     }
   };
+
+  // Build the selectable group options, hiding groups that disallow mainland
+  // China users when the visitor is detected to be in mainland China.
+  useEffect(() => {
+    let localGroupOptions = Object.entries(rawGroupData)
+      .filter(([, info]) => !(isMainland && info.allow_mainland === false))
+      .map(([group, info]) => ({
+        label: info.desc,
+        value: group,
+        ratio: info.ratio,
+      }));
+    if (statusState?.status?.default_use_auto_group) {
+      if (localGroupOptions.some((group) => group.value === 'auto')) {
+        localGroupOptions.sort((a, b) => (a.value === 'auto' ? -1 : 1));
+      }
+    }
+    setGroups(localGroupOptions);
+  }, [rawGroupData, isMainland, statusState?.status?.default_use_auto_group]);
 
   const loadToken = async () => {
     setLoading(true);

@@ -101,6 +101,7 @@ const SystemSetting = () => {
     LinuxDOClientSecret: '',
     LinuxDOMinimumTrustLevel: '',
     ServerAddress: '',
+    DefaultSiteLanguage: 'zh-CN',
     // SSRF防护配置
     'fetch_setting.enable_ssrf_protection': true,
     'fetch_setting.allow_private_ip': '',
@@ -317,6 +318,12 @@ const SystemSetting = () => {
   const submitServerAddress = async () => {
     let ServerAddress = removeTrailingSlash(inputs.ServerAddress);
     await updateOptions([{ key: 'ServerAddress', value: ServerAddress }]);
+  };
+
+  const submitDefaultSiteLanguage = async () => {
+    await updateOptions([
+      { key: 'DefaultSiteLanguage', value: inputs.DefaultSiteLanguage },
+    ]);
   };
 
   const submitSMTP = async () => {
@@ -731,6 +738,33 @@ const SystemSetting = () => {
                   </Row>
                   <Button onClick={submitServerAddress}>
                     {t('更新服务器地址')}
+                  </Button>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                    style={{ marginTop: 16 }}
+                  >
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Select
+                        field='DefaultSiteLanguage'
+                        label={t('默认语言')}
+                        style={{ width: '100%' }}
+                        extraText={t(
+                          '新访客（未选择过语言）首次访问时使用的默认界面语言；已选择语言的用户不受影响',
+                        )}
+                        optionList={[
+                          { label: '简体中文', value: 'zh-CN' },
+                          { label: '繁體中文', value: 'zh-TW' },
+                          { label: 'English', value: 'en' },
+                          { label: 'Français', value: 'fr' },
+                          { label: 'Русский', value: 'ru' },
+                          { label: '日本語', value: 'ja' },
+                          { label: 'Tiếng Việt', value: 'vi' },
+                        ]}
+                      />
+                    </Col>
+                  </Row>
+                  <Button onClick={submitDefaultSiteLanguage}>
+                    {t('更新默认语言')}
                   </Button>
                 </Form.Section>
               </Card>

@@ -31,6 +31,7 @@ func SetApiRouter(router *gin.Engine) {
 		//apiRouter.GET("/midjourney", controller.GetMidjourney)
 		apiRouter.GET("/home_page_content", controller.GetHomePageContent)
 		apiRouter.GET("/pricing", middleware.TryUserAuth(), controller.GetPricing)
+		apiRouter.GET("/region", controller.GetRegion)
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)
 		apiRouter.POST("/user/reset", middleware.CriticalRateLimit(), controller.ResetPassword)
@@ -135,6 +136,24 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/2fa/stats", controller.Admin2FAStats)
 				adminRoute.DELETE("/:id/2fa", controller.AdminDisable2FA)
 			}
+		}
+
+		// Ticket system (工单)
+		ticketRoute := apiRouter.Group("/ticket")
+		ticketRoute.Use(middleware.UserAuth())
+		{
+			ticketRoute.GET("/", controller.ListUserTickets)
+			ticketRoute.POST("/", controller.CreateTicket)
+			ticketRoute.GET("/:id", controller.GetUserTicket)
+			ticketRoute.POST("/:id/reply", controller.ReplyUserTicket)
+		}
+		ticketAdminRoute := apiRouter.Group("/admin/ticket")
+		ticketAdminRoute.Use(middleware.AdminAuth())
+		{
+			ticketAdminRoute.GET("/", controller.AdminListTickets)
+			ticketAdminRoute.GET("/:id", controller.AdminGetTicket)
+			ticketAdminRoute.POST("/:id/reply", controller.AdminReplyTicket)
+			ticketAdminRoute.PUT("/:id/status", controller.AdminUpdateTicketStatus)
 		}
 
 		// Subscription billing (plans, purchase, admin management)

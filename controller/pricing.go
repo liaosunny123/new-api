@@ -64,15 +64,21 @@ func GetPricing(c *gin.Context) {
 		}
 	}
 
+	groupAllowMainland := map[string]bool{}
+	for g := range usableGroup {
+		groupAllowMainland[g] = ratio_setting.AllowMainlandForGroup(g)
+	}
+
 	c.JSON(200, gin.H{
-		"success":            true,
-		"data":               pricing,
-		"vendors":            model.GetVendors(),
-		"group_ratio":        groupRatio,
-		"usable_group":       usableGroup,
-		"supported_endpoint": model.GetSupportedEndpointMap(),
-		"auto_groups":        service.GetUserAutoGroup(group),
-		"pricing_version":    "a42d372ccf0b5dd13ecf71203521f9d2",
+		"success":              true,
+		"data":                 pricing,
+		"vendors":              model.GetVendors(),
+		"group_ratio":          groupRatio,
+		"group_allow_mainland": groupAllowMainland,
+		"usable_group":         usableGroup,
+		"supported_endpoint":   model.GetSupportedEndpointMap(),
+		"auto_groups":          service.GetUserAutoGroup(group),
+		"pricing_version":      "a42d372ccf0b5dd13ecf71203521f9d2",
 	})
 }
 

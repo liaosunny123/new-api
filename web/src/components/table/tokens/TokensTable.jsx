@@ -25,6 +25,7 @@ import {
   IllustrationNoResultDark,
 } from '@douyinfe/semi-illustrations';
 import { getTokensColumns } from './TokensColumnDefs';
+import { useRegion } from '../../../hooks/common/useRegion';
 
 const TokensTable = (tokensData) => {
   const {
@@ -50,8 +51,22 @@ const TokensTable = (tokensData) => {
     setShowEdit,
     refresh,
     groupRatios,
+    groupAllowMainland,
     t,
   } = tokensData;
+
+  const { isMainland } = useRegion();
+
+  // Groups that are blocked for this visitor's region (mainland China + group disallows it).
+  const restrictedGroups = useMemo(() => {
+    const set = new Set();
+    if (isMainland && groupAllowMainland) {
+      Object.entries(groupAllowMainland).forEach(([name, allow]) => {
+        if (allow === false) set.add(name);
+      });
+    }
+    return set;
+  }, [isMainland, groupAllowMainland]);
 
   // Get all columns
   const columns = useMemo(() => {
@@ -69,6 +84,7 @@ const TokensTable = (tokensData) => {
       setShowEdit,
       refresh,
       groupRatios,
+      restrictedGroups,
     });
   }, [
     t,
@@ -84,6 +100,7 @@ const TokensTable = (tokensData) => {
     setShowEdit,
     refresh,
     groupRatios,
+    restrictedGroups,
   ]);
 
   // Handle compact mode by removing fixed positioning
