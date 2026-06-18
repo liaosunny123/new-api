@@ -86,6 +86,14 @@ func InitOptionMap() {
 	common.OptionMap["StripePriceId"] = setting.StripePriceId
 	common.OptionMap["StripeUnitPrice"] = strconv.FormatFloat(setting.StripeUnitPrice, 'f', -1, 64)
 	common.OptionMap["StripePromotionCodesEnabled"] = strconv.FormatBool(setting.StripePromotionCodesEnabled)
+	common.OptionMap["StripeEnabled"] = strconv.FormatBool(setting.StripeEnabled)
+	common.OptionMap["StripeCurrency"] = setting.StripeCurrency
+	common.OptionMap["StripeExchangeRate"] = strconv.FormatFloat(setting.StripeExchangeRate, 'f', -1, 64)
+	common.OptionMap["StripeMinAmount"] = strconv.FormatFloat(setting.StripeMinAmount, 'f', -1, 64)
+	common.OptionMap["StripeMaxAmount"] = strconv.FormatFloat(setting.StripeMaxAmount, 'f', -1, 64)
+	common.OptionMap["StripeFeeEnabled"] = strconv.FormatBool(setting.StripeFeeEnabled)
+	common.OptionMap["StripeFeePercent"] = strconv.FormatFloat(setting.StripeFeePercent, 'f', -1, 64)
+	common.OptionMap["StripeFeeFixed"] = strconv.FormatFloat(setting.StripeFeeFixed, 'f', -1, 64)
 	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
 	common.OptionMap["CreemProducts"] = setting.CreemProducts
 	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
@@ -374,6 +382,22 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.StripeMinTopUp, _ = strconv.Atoi(value)
 	case "StripePromotionCodesEnabled":
 		setting.StripePromotionCodesEnabled = value == "true"
+	case "StripeEnabled":
+		setting.StripeEnabled = value == "true"
+	case "StripeCurrency":
+		setting.StripeCurrency = value
+	case "StripeExchangeRate":
+		setting.StripeExchangeRate, _ = strconv.ParseFloat(value, 64)
+	case "StripeMinAmount":
+		setting.StripeMinAmount, _ = strconv.ParseFloat(value, 64)
+	case "StripeMaxAmount":
+		setting.StripeMaxAmount, _ = strconv.ParseFloat(value, 64)
+	case "StripeFeeEnabled":
+		setting.StripeFeeEnabled = value == "true"
+	case "StripeFeePercent":
+		setting.StripeFeePercent, _ = strconv.ParseFloat(value, 64)
+	case "StripeFeeFixed":
+		setting.StripeFeeFixed, _ = strconv.ParseFloat(value, 64)
 	case "CreemApiKey":
 		setting.CreemApiKey = value
 	case "CreemProducts":

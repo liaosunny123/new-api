@@ -55,6 +55,14 @@ const PaymentSetting = () => {
     StripeUnitPrice: 8.0,
     StripeMinTopUp: 1,
     StripePromotionCodesEnabled: false,
+    StripeEnabled: false,
+    StripeCurrency: 'usd',
+    StripeExchangeRate: 1,
+    StripeMinAmount: 0,
+    StripeMaxAmount: 0,
+    StripeFeeEnabled: false,
+    StripeFeePercent: 3.4,
+    StripeFeeFixed: 2.35,
   });
 
   let [loading, setLoading] = useState(false);
@@ -121,6 +129,11 @@ const PaymentSetting = () => {
           case 'MinTopUp':
           case 'StripeUnitPrice':
           case 'StripeMinTopUp':
+          case 'StripeExchangeRate':
+          case 'StripeMinAmount':
+          case 'StripeMaxAmount':
+          case 'StripeFeePercent':
+          case 'StripeFeeFixed':
             newInputs[item.key] = parseFloat(item.value);
             break;
           default:

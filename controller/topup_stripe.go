@@ -62,12 +62,20 @@ func (*StripeAdaptor) RequestAmount(c *gin.Context, req *StripePayRequest) {
 		c.JSON(200, gin.H{"message": "error", "data": "充值金额过低"})
 		return
 	}
+	if msg := checkStripeAmountLimit(payMoney); msg != "" {
+		c.JSON(200, gin.H{"message": "error", "data": msg})
+		return
+	}
 	c.JSON(200, gin.H{"message": "success", "data": strconv.FormatFloat(payMoney, 'f', 2, 64)})
 }
 
 func (*StripeAdaptor) RequestPay(c *gin.Context, req *StripePayRequest) {
 	if req.PaymentMethod != PaymentMethodStripe {
 		c.JSON(200, gin.H{"message": "error", "data": "不支持的支付渠道"})
+		return
+	}
+	if !setting.StripeEnabled {
+		c.JSON(200, gin.H{"message": "error", "data": "管理员未开启 Stripe 支付"})
 		return
 	}
 	if req.Amount < getStripeMinTopup() {
@@ -102,10 +110,23 @@ func (*StripeAdaptor) RequestPay(c *gin.Context, req *StripePayRequest) {
 	user, _ := model.GetUserById(id, false)
 	chargedMoney := GetChargedAmount(float64(req.Amount), *user)
 
+	// 计算 CNY 充值金额并做金额限额校验（min/max 针对 CNY 充值金额）
+	group, gErr := model.GetUserGroup(id, true)
+	if gErr != nil {
+		group = user.Group
+	}
+	payMoney := getStripePayMoney(float64(req.Amount), group)
+	if msg := checkStripeAmountLimit(payMoney); msg != "" {
+		c.JSON(200, gin.H{"message": "error", "data": msg})
+		return
+	}
+	// 换算为扣款货币并计算（gross-up）处理费
+	chargeAmount, feeAmount, currency := stripeCharge(payMoney)
+
 	reference := fmt.Sprintf("new-api-ref-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))
 	referenceId := "ref_" + common.Sha1([]byte(reference))
 
-	payLink, err := genStripeLink(referenceId, user.StripeCustomer, user.Email, req.Amount, req.SuccessURL, req.CancelURL)
+	payLink, err := genStripeLink(referenceId, user.StripeCustomer, user.Email, chargeAmount, feeAmount, currency, req.SuccessURL, req.CancelURL)
 	if err != nil {
 		log.Println("获取Stripe Checkout支付链接失败", err)
 		c.JSON(200, gin.H{"message": "error", "data": "拉起支付失败"})
@@ -337,19 +358,17 @@ func sessionExpired(event stripe.Event) {
 	log.Println("充值订单已过期", referenceId)
 }
 
-// genStripeLink generates a Stripe Checkout session URL for payment.
-// It creates a new checkout session with the specified parameters and returns the payment URL.
+// genStripeLink 生成 Stripe Checkout 会话链接（直接按金额生成订单，不依赖 Price ID）。
 //
-// Parameters:
-//   - referenceId: unique reference identifier for the transaction
-//   - customerId: existing Stripe customer ID (empty string if new customer)
-//   - email: customer email address for new customer creation
-//   - amount: quantity of units to purchase
-//   - successURL: custom URL to redirect after successful payment (empty for default)
-//   - cancelURL: custom URL to redirect when payment is canceled (empty for default)
-//
-// Returns the checkout session URL or an error if the session creation fails.
-func genStripeLink(referenceId string, customerId string, email string, amount int64, successURL string, cancelURL string) (string, error) {
+// 参数：
+//   - referenceId: 交易唯一引用号
+//   - customerId:  已有的 Stripe Customer ID（为空表示新客户，按邮箱创建）
+//   - email:       新客户使用的邮箱
+//   - chargeAmount: 扣款货币下的产品金额（已按汇率换算）
+//   - feeAmount:    扣款货币下的处理费金额（0 表示不加收）
+//   - currency:    扣款货币（小写）
+//   - successURL/cancelURL: 自定义跳转地址（为空用默认）
+func genStripeLink(referenceId string, customerId string, email string, chargeAmount float64, feeAmount float64, currency string, successURL string, cancelURL string) (string, error) {
 	if !strings.HasPrefix(setting.StripeApiSecret, "sk_") && !strings.HasPrefix(setting.StripeApiSecret, "rk_") {
 		return "", fmt.Errorf("无效的Stripe API密钥")
 	}
@@ -364,16 +383,38 @@ func genStripeLink(referenceId string, customerId string, email string, amount i
 		cancelURL = system_setting.ServerAddress + "/console/topup"
 	}
 
-	params := &stripe.CheckoutSessionParams{
-		ClientReferenceID: stripe.String(referenceId),
-		SuccessURL:        stripe.String(successURL),
-		CancelURL:         stripe.String(cancelURL),
-		LineItems: []*stripe.CheckoutSessionLineItemParams{
-			{
-				Price:    stripe.String(setting.StripePriceId),
-				Quantity: stripe.Int64(amount),
+	// 按金额内联生成 line item（无需 Price ID）
+	lineItems := []*stripe.CheckoutSessionLineItemParams{
+		{
+			Quantity: stripe.Int64(1),
+			PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
+				Currency:   stripe.String(currency),
+				UnitAmount: stripe.Int64(stripeToMinor(chargeAmount, currency)),
+				ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
+					Name: stripe.String("余额充值 / Account Top-up"),
+				},
 			},
 		},
+	}
+	// 处理费作为独立行展示（金额已 gross-up 算好）
+	if feeAmount > 0 {
+		lineItems = append(lineItems, &stripe.CheckoutSessionLineItemParams{
+			Quantity: stripe.Int64(1),
+			PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
+				Currency:   stripe.String(currency),
+				UnitAmount: stripe.Int64(stripeToMinor(feeAmount, currency)),
+				ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
+					Name: stripe.String("Stripe 处理费 / Stripe Processing Fee"),
+				},
+			},
+		})
+	}
+
+	params := &stripe.CheckoutSessionParams{
+		ClientReferenceID:   stripe.String(referenceId),
+		SuccessURL:          stripe.String(successURL),
+		CancelURL:           stripe.String(cancelURL),
+		LineItems:           lineItems,
 		Mode:                stripe.String(string(stripe.CheckoutSessionModePayment)),
 		AllowPromotionCodes: stripe.Bool(setting.StripePromotionCodesEnabled),
 	}
@@ -394,6 +435,61 @@ func genStripeLink(referenceId string, customerId string, email string, amount i
 	}
 
 	return result.URL, nil
+}
+
+// stripeZeroDecimalCurrencies 不使用最小货币单位（不 ×100）的货币
+var stripeZeroDecimalCurrencies = map[string]bool{
+	"bif": true, "clp": true, "djf": true, "gnf": true, "jpy": true,
+	"kmf": true, "krw": true, "mga": true, "pyg": true, "rwf": true,
+	"ugx": true, "vnd": true, "vuv": true, "xaf": true, "xof": true, "xpf": true,
+}
+
+// stripeToMinor 将金额换算成 Stripe 使用的最小货币单位
+func stripeToMinor(amount float64, currency string) int64 {
+	if stripeZeroDecimalCurrencies[strings.ToLower(currency)] {
+		return int64(amount + 0.5)
+	}
+	return int64(amount*100 + 0.5)
+}
+
+// stripeRound2 四舍五入到分
+func stripeRound2(v float64) float64 {
+	return float64(int64(v*100+0.5)) / 100
+}
+
+// stripeCharge 把 CNY 充值金额换算为扣款货币，并按 gross-up 计算处理费。
+// 返回：产品金额、处理费金额（均为扣款货币）、货币代码。
+func stripeCharge(payMoneyCNY float64) (product float64, fee float64, currency string) {
+	currency = strings.ToLower(setting.StripeCurrency)
+	if currency == "" {
+		currency = "usd"
+	}
+	rate := setting.StripeExchangeRate
+	if currency == "cny" || rate <= 0 {
+		rate = 1
+	}
+	product = stripeRound2(payMoneyCNY * rate)
+
+	if setting.StripeFeeEnabled {
+		r := setting.StripeFeePercent / 100
+		if r > 0 && r < 1 {
+			// gross-up: charge=(product+fixed)/(1-r)，fee=charge-product，使商家到手≈product
+			fee = stripeRound2((product+setting.StripeFeeFixed)/(1-r) - product)
+		} else {
+			fee = stripeRound2(setting.StripeFeeFixed)
+		}
+	}
+	return
+}
+
+// checkStripeAmountLimit 校验 CNY 充值金额是否在配置的 [min, max] 内（0 表示不限）。
+// 超限返回给用户的提示文案，正常返回空串。
+func checkStripeAmountLimit(payMoneyCNY float64) string {
+	if (setting.StripeMinAmount > 0 && payMoneyCNY < setting.StripeMinAmount) ||
+		(setting.StripeMaxAmount > 0 && payMoneyCNY > setting.StripeMaxAmount) {
+		return "我们暂时无法为您设定的金额发起 Stripe 支付，请使用其他支付方式或联系管理员"
+	}
+	return ""
 }
 
 func GetChargedAmount(count float64, user model.User) float64 {
