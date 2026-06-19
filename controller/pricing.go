@@ -46,10 +46,15 @@ func GetPricing(c *gin.Context) {
 		user, err := model.GetUserCache(userId.(int))
 		if err == nil {
 			group = user.Group
+			userSetting := user.GetSetting()
 			for g := range groupRatio {
 				ratio, ok := ratio_setting.GetGroupGroupRatio(group, g)
 				if ok {
 					groupRatio[g] = ratio
+				}
+				// 用户级别分组倍率覆盖（分组价格设置），优先级最高
+				if userRatio, exists := userSetting.GetGroupRatioOverride(g); exists {
+					groupRatio[g] = userRatio
 				}
 			}
 		}

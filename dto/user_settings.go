@@ -22,6 +22,19 @@ type UserSetting struct {
 	BillingPreference                string  `json:"billing_preference,omitempty"`                   // BillingPreference 扣费策略（订阅/钱包）
 	Language                         string                          `json:"language,omitempty"`                             // Language 用户语言偏好 (zh, en)
 	RateLimitOverrides               map[string]GroupRateLimitOverride `json:"rate_limit_overrides,omitempty"`                 // 用户级别的分组RPM/并发限制覆盖
+	GroupRatioEnabled                bool                              `json:"group_ratio_enabled,omitempty"`                  // 分组价格设置总开关，关闭时所有分组倍率覆盖均不生效
+	GroupRatioOverrides              map[string]float64                `json:"group_ratio_overrides,omitempty"`                // 用户级别的分组倍率覆盖：分组名 -> 倍率，优先级高于系统分组倍率
+}
+
+// GetGroupRatioOverride 返回该用户针对指定分组的倍率覆盖。
+// 仅当总开关开启且为该分组配置了倍率时返回 (ratio, true)，否则返回 (0, false)。
+// 所有计费路径都应通过此方法读取覆盖，确保行为一致。
+func (s UserSetting) GetGroupRatioOverride(group string) (float64, bool) {
+	if !s.GroupRatioEnabled || s.GroupRatioOverrides == nil {
+		return 0, false
+	}
+	ratio, ok := s.GroupRatioOverrides[group]
+	return ratio, ok
 }
 
 var (

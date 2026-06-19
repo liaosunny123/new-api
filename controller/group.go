@@ -28,12 +28,18 @@ func GetUserGroups(c *gin.Context) {
 	userGroup := ""
 	userId := c.GetInt("id")
 	userGroup, _ = model.GetUserGroup(userId, false)
+	userSetting, _ := model.GetUserSetting(userId, false)
 	userUsableGroups := service.GetUserUsableGroups(userGroup)
 	for groupName, _ := range ratio_setting.GetGroupRatioCopy() {
 		// UserUsableGroups contains the groups that the user can use
 		if desc, ok := userUsableGroups[groupName]; ok {
+			ratio := service.GetUserGroupRatio(userGroup, groupName)
+			// 用户级别分组倍率覆盖（分组价格设置），优先级最高
+			if userRatio, exists := userSetting.GetGroupRatioOverride(groupName); exists {
+				ratio = userRatio
+			}
 			usableGroups[groupName] = map[string]interface{}{
-				"ratio":          service.GetUserGroupRatio(userGroup, groupName),
+				"ratio":          ratio,
 				"desc":           desc,
 				"allow_mainland": ratio_setting.AllowMainlandForGroup(groupName),
 			}
