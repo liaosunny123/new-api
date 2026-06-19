@@ -282,6 +282,12 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	} else {
 		finalGroupRatio = groupRatio
 	}
+	// 用户级别分组倍率覆盖（分组价格设置），优先级最高
+	if userSetting, err := model.GetUserSetting(task.UserId, false); err == nil {
+		if userRatio, exists := userSetting.GetGroupRatioOverride(group); exists {
+			finalGroupRatio = userRatio
+		}
+	}
 
 	// 计算 OtherRatios 乘积（视频折扣、时长等）
 	otherMultiplier := 1.0

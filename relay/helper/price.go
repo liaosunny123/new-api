@@ -58,6 +58,14 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 		groupRatioInfo.GroupRatio = ratio_setting.GetGroupRatio(relayInfo.UsingGroup)
 	}
 
+	// 用户级别分组倍率覆盖（分组价格设置），优先级最高：
+	// 仅当用户开启总开关且为当前使用分组配置了倍率时，直接替换分组倍率。
+	if userRatio, exists := relayInfo.UserSetting.GetGroupRatioOverride(relayInfo.UsingGroup); exists {
+		groupRatioInfo.GroupRatio = userRatio
+		groupRatioInfo.GroupSpecialRatio = userRatio
+		groupRatioInfo.HasSpecialRatio = true
+	}
+
 	return groupRatioInfo
 }
 

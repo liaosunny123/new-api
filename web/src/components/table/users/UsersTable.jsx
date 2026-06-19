@@ -33,6 +33,7 @@ import ResetPasskeyModal from './modals/ResetPasskeyModal';
 import ResetTwoFAModal from './modals/ResetTwoFAModal';
 import UserSubscriptionsModal from './modals/UserSubscriptionsModal';
 import UserRateLimitModal from './modals/UserRateLimitModal';
+import UserGroupRatioModal from './modals/UserGroupRatioModal';
 
 const UsersTable = (usersData) => {
   const {
@@ -66,6 +67,7 @@ const UsersTable = (usersData) => {
   const [showUserSubscriptionsModal, setShowUserSubscriptionsModal] =
     useState(false);
   const [showRateLimitModal, setShowRateLimitModal] = useState(false);
+  const [showGroupRatioModal, setShowGroupRatioModal] = useState(false);
 
   // Modal handlers
   const showPromoteUserModal = (user) => {
@@ -109,6 +111,11 @@ const UsersTable = (usersData) => {
     setShowRateLimitModal(true);
   };
 
+  const showGroupRatioUserModal = (user) => {
+    setModalUser(user);
+    setShowGroupRatioModal(true);
+  };
+
   // Modal confirm handlers
   const handlePromoteConfirm = () => {
     manageUser(modalUser.id, 'promote', modalUser);
@@ -149,6 +156,7 @@ const UsersTable = (usersData) => {
       showResetTwoFAModal: showResetTwoFAUserModal,
       showUserSubscriptionsModal: showUserSubscriptionsUserModal,
       showRateLimitModal: showRateLimitUserModal,
+      showGroupRatioModal: showGroupRatioUserModal,
     });
   }, [
     t,
@@ -162,6 +170,7 @@ const UsersTable = (usersData) => {
     showResetTwoFAUserModal,
     showUserSubscriptionsUserModal,
     showRateLimitUserModal,
+    showGroupRatioUserModal,
   ]);
 
   // Handle compact mode by removing fixed positioning
@@ -273,6 +282,13 @@ const UsersTable = (usersData) => {
       <UserRateLimitModal
         visible={showRateLimitModal}
         onCancel={() => setShowRateLimitModal(false)}
+        userId={modalUser?.id}
+        username={modalUser?.username || ''}
+      />
+
+      <UserGroupRatioModal
+        visible={showGroupRatioModal}
+        onCancel={() => setShowGroupRatioModal(false)}
         userId={modalUser?.id}
         username={modalUser?.username || ''}
       />

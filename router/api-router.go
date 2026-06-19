@@ -131,6 +131,8 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/:id/rate-limit-usage", controller.GetUserRateLimitUsage)
 				adminRoute.GET("/:id/rate-limit-overrides", controller.GetUserRateLimitOverrides)
 				adminRoute.PUT("/:id/rate-limit-overrides", controller.UpdateUserRateLimitOverrides)
+				adminRoute.GET("/:id/group-ratio-overrides", controller.GetUserGroupRatioOverrides)
+				adminRoute.PUT("/:id/group-ratio-overrides", controller.UpdateUserGroupRatioOverrides)
 
 				// Admin 2FA routes
 				adminRoute.GET("/2fa/stats", controller.Admin2FAStats)

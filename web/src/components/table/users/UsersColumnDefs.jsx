@@ -210,6 +210,7 @@ const renderOperations = (
     showResetTwoFAModal,
     showUserSubscriptionsModal,
     showRateLimitModal,
+    showGroupRatioModal,
     t,
   },
 ) => {
@@ -227,6 +228,11 @@ const renderOperations = (
       node: 'item',
       name: t('限流设置'),
       onClick: () => showRateLimitModal(record),
+    },
+    {
+      node: 'item',
+      name: t('分组价格设置'),
+      onClick: () => showGroupRatioModal(record),
     },
     {
       node: 'divider',
@@ -316,6 +322,7 @@ export const getUsersColumns = ({
   showResetTwoFAModal,
   showUserSubscriptionsModal,
   showRateLimitModal,
+  showGroupRatioModal,
 }) => {
   return [
     {
@@ -374,6 +381,7 @@ export const getUsersColumns = ({
           showResetTwoFAModal,
           showUserSubscriptionsModal,
           showRateLimitModal,
+          showGroupRatioModal,
           t,
         }),
     },

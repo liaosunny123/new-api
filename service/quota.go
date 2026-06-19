@@ -120,6 +120,10 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 	if ok {
 		actualGroupRatio = userGroupRatio
 	}
+	// 用户级别分组倍率覆盖（分组价格设置），优先级最高
+	if userRatio, exists := relayInfo.UserSetting.GetGroupRatioOverride(relayInfo.UsingGroup); exists {
+		actualGroupRatio = userRatio
+	}
 
 	quotaInfo := QuotaInfo{
 		InputDetails: TokenDetails{
