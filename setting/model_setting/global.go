@@ -36,6 +36,9 @@ type GlobalSettings struct {
 	PassThroughRequestEnabled        bool                             `json:"pass_through_request_enabled"`
 	ThinkingModelBlacklist           []string                         `json:"thinking_model_blacklist"`
 	ChatCompletionsToResponsesPolicy ChatCompletionsToResponsesPolicy `json:"chat_completions_to_responses_policy"`
+	// ImageProxyEnabled 开启后，图片接口（images/generations、edits 等）返回的非本站 URL
+	// 会被改写为本站 /assets/<token> 地址，由本站代理拉取，隐藏上游来源。
+	ImageProxyEnabled bool `json:"image_proxy_enabled"`
 }
 
 // 默认配置
