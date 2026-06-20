@@ -1661,6 +1661,8 @@
     "启用签到功能": "Enable check-in feature",
     "启用请求体透传功能": "Enable request body pass-through functionality",
     "启用请求透传": "Enable request pass-through",
+    "启用图片地址代理": "Enable image URL proxy",
+    "开启后，图片接口（images/generations、edits 等）返回的非本站 URL 将改写为本站 /file-assets/ 地址，由本站代理拉取，隐藏上游来源": "When enabled, non-local URLs returned by image endpoints (images/generations, edits, etc.) are rewritten to this site's /file-assets/ address and proxied by this site, hiding the upstream source.",
     "启用全部": "Enable all",
     "启用数据看板（实验性）": "Enable data dashboard (experimental)",
     "启用所有密钥失败": "Failed to enable all keys",

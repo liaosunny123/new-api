@@ -106,7 +106,26 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 		}
 	}
 
+	// 当图片 URL 代理开启且为非流式响应时，缓冲 adaptor 写出的响应体，
+	// 以便把非本站的 data[].url 改写为本站 /assets/<token> 代理地址后再下发。
+	var capturer *service.ImageResponseCapturer
+	if model_setting.GetGlobalSettings().ImageProxyEnabled && !info.IsStream {
+		capturer = service.NewImageResponseCapturer(c.Writer)
+		c.Writer = capturer
+	}
+
 	usage, newAPIError := adaptor.DoResponse(c, httpResp, info)
+
+	if capturer != nil {
+		// 恢复真实 writer：成功时下发改写后的响应体；失败时丢弃缓冲，
+		// 交由上层错误处理把错误 JSON 写入真实 writer。
+		c.Writer = capturer.ResponseWriter
+		if newAPIError == nil {
+			body := service.RewriteImageResponseBody(c, info.ChannelId, capturer.Body())
+			capturer.Commit(body)
+		}
+	}
+
 	if newAPIError != nil {
 		// reset status code 重置状态码
 		service.ResetStatusCode(newAPIError, statusCodeMappingStr)
