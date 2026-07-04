@@ -243,7 +243,7 @@ func RelaySwapFace(c *gin.Context, info *relaycommon.RelayInfo) *dto.MidjourneyR
 				Other:     other,
 			})
 			model.UpdateUserUsedQuotaAndRequestCount(info.UserId, priceData.Quota)
-			model.UpdateChannelUsedQuota(info.ChannelId, priceData.Quota)
+			model.UpdateChannelUsedQuotaWithGroupRatio(info.ChannelId, priceData.Quota, priceData.GroupRatioInfo.GroupRatio)
 		}
 	}()
 	midjResponse := &mjResp.Response
@@ -549,7 +549,7 @@ func RelayMidjourneySubmit(c *gin.Context, relayInfo *relaycommon.RelayInfo) *dt
 				Other:     other,
 			})
 			model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, priceData.Quota)
-			model.UpdateChannelUsedQuota(relayInfo.ChannelId, priceData.Quota)
+			model.UpdateChannelUsedQuotaWithGroupRatio(relayInfo.ChannelId, priceData.Quota, priceData.GroupRatioInfo.GroupRatio)
 		}
 	}()
 

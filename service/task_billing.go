@@ -61,7 +61,7 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		Other:     other,
 	})
 	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, info.PriceData.Quota)
-	model.UpdateChannelUsedQuota(info.ChannelId, info.PriceData.Quota)
+	model.UpdateChannelUsedQuotaWithGroupRatio(info.ChannelId, info.PriceData.Quota, info.PriceData.GroupRatioInfo.GroupRatio)
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +137,14 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 		other["upstream_model_name"] = props.UpstreamModelName
 	}
 	return other
+}
+
+// taskGroupRatio 从 task 的 BillingContext 中获取分组倍率，缺失时回退为 1.0。
+func taskGroupRatio(task *model.Task) float64 {
+	if bc := task.PrivateData.BillingContext; bc != nil && bc.GroupRatio > 0 {
+		return bc.GroupRatio
+	}
+	return 1.0
 }
 
 // taskModelName 从 BillingContext 或 Properties 中获取模型名称。
@@ -222,7 +230,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		logType = model.LogTypeConsume
 		logQuota = quotaDelta
 		model.UpdateUserUsedQuotaAndRequestCount(task.UserId, quotaDelta)
-		model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
+		model.UpdateChannelUsedQuotaWithGroupRatio(task.ChannelId, quotaDelta, taskGroupRatio(task))
 	} else {
 		logType = model.LogTypeRefund
 		logQuota = -quotaDelta

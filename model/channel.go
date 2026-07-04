@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"sync"
@@ -759,6 +760,22 @@ func UpdateChannelUsedQuota(id int, quota int) {
 		return
 	}
 	updateChannelUsedQuota(id, quota)
+}
+
+// UpdateChannelUsedQuotaWithGroupRatio 记录渠道真实消费（分组倍率 1.0）。
+// 传入的 quota 是按用户分组倍率计费后的额度（即真实成本 × 分组倍率），
+// 这里把分组倍率除回去，使渠道「已用」反映渠道真实消耗的美元额度，
+// 而不受用户分组倍率影响。groupRatio <= 0（免费场景，用户额度本身也为 0）时按原值记录。
+func UpdateChannelUsedQuotaWithGroupRatio(id int, quota int, groupRatio float64) {
+	UpdateChannelUsedQuota(id, channelRealCostQuota(quota, groupRatio))
+}
+
+// channelRealCostQuota 将含分组倍率的计费额度还原为分组倍率 1.0 下的真实成本额度。
+func channelRealCostQuota(quota int, groupRatio float64) int {
+	if groupRatio <= 0 || groupRatio == 1 {
+		return quota
+	}
+	return int(math.Round(float64(quota) / groupRatio))
 }
 
 func updateChannelUsedQuota(id int, quota int) {

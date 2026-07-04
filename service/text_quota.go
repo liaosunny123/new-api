@@ -344,7 +344,7 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 			extraContent = append(extraContent, fmt.Sprintf("客户端主动断开连接，按已接收内容计费 (prompt: %d, completion: %d)", summary.PromptTokens, summary.CompletionTokens))
 		}
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, summary.Quota)
-		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
+		model.UpdateChannelUsedQuotaWithGroupRatio(relayInfo.ChannelId, summary.Quota, summary.GroupRatio)
 	}
 
 	if err := SettleBilling(ctx, relayInfo, summary.Quota); err != nil {
