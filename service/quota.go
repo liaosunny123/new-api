@@ -39,6 +39,40 @@ type QuotaInfo struct {
 	GroupRatio    float64
 }
 
+// maxQuotaDecimal mirrors common.MaxQuotaValue for decimal-space comparison.
+var maxQuotaDecimal = decimal.NewFromInt(int64(common.MaxQuotaValue))
+
+// safeQuotaFromDecimal converts a computed decimal quota to int, saturating into
+// [0, common.MaxQuotaValue]. decimal.IntPart() ultimately calls big.Int.Int64(),
+// which silently wraps (and can go NEGATIVE) once the value exceeds int64 — the
+// root cause of the oversized-parameter "charge becomes credit" overflow.
+// Comparing in decimal space before the int64 conversion avoids the wrap
+// entirely. The returned bool reports whether saturation clamped the value.
+func safeQuotaFromDecimal(d decimal.Decimal) (int, bool) {
+	if d.Sign() <= 0 {
+		return 0, d.Sign() < 0
+	}
+	if d.GreaterThanOrEqual(maxQuotaDecimal) {
+		return common.MaxQuotaValue, true
+	}
+	return int(d.IntPart()), false
+}
+
+// logQuotaSaturation records a clamped quota computation so administrators can
+// spot accounts probing the billing path with oversized parameters.
+func logQuotaSaturation(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, stage string, clamped int) {
+	modelName := ""
+	userId := 0
+	if relayInfo != nil {
+		modelName = relayInfo.OriginModelName
+		userId = relayInfo.UserId
+	}
+	logger.LogError(ctx, fmt.Sprintf(
+		"quota saturation detected (stage=%s model=%s user=%d token=%s): computed value exceeded safe bounds and was clamped to %d — likely an oversized billing parameter (n/duration/max_tokens); review this account",
+		stage, modelName, userId, ctx.GetString("token_name"), clamped,
+	))
+}
+
 func hasCustomModelRatio(modelName string, currentRatio float64) bool {
 	defaultRatio, exists := ratio_setting.GetDefaultModelRatioMap()[modelName]
 	if !exists {
@@ -54,7 +88,8 @@ func calculateAudioQuota(info QuotaInfo) int {
 		groupRatio := decimal.NewFromFloat(info.GroupRatio)
 
 		quota := modelPrice.Mul(quotaPerUnit).Mul(groupRatio)
-		return int(quota.IntPart())
+		q, _ := safeQuotaFromDecimal(quota)
+		return q
 	}
 
 	completionRatio := decimal.NewFromFloat(ratio_setting.GetCompletionRatio(info.ModelName))
@@ -83,7 +118,8 @@ func calculateAudioQuota(info QuotaInfo) int {
 		quota = decimal.NewFromInt(1)
 	}
 
-	return int(quota.Round(0).IntPart())
+	q, _ := safeQuotaFromDecimal(quota.Round(0))
+	return q
 }
 
 func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.RealtimeUsage) error {

@@ -69,6 +69,21 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 	return groupRatioInfo
 }
 
+// logPriceSaturation records a pre-consume quota that had to be clamped to the
+// safe ceiling, so administrators can spot oversized-parameter probing.
+func logPriceSaturation(c *gin.Context, info *relaycommon.RelayInfo, stage string, clamped int) {
+	modelName := ""
+	userId := 0
+	if info != nil {
+		modelName = info.OriginModelName
+		userId = info.UserId
+	}
+	logger.LogError(c, fmt.Sprintf(
+		"quota saturation detected (stage=%s model=%s user=%d): pre-consume value exceeded safe bounds and was clamped to %d — likely an oversized billing parameter (n/duration/max_tokens); review this account",
+		stage, modelName, userId, clamped,
+	))
+}
+
 func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens int, meta *types.TokenCountMeta) (types.PriceData, error) {
 	modelPrice, usePrice := ratio_setting.GetModelPrice(info.OriginModelName, false)
 
@@ -112,12 +127,20 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		audioRatio = ratio_setting.GetAudioRatio(info.OriginModelName)
 		audioCompletionRatio = ratio_setting.GetAudioCompletionRatio(info.OriginModelName)
 		ratio := modelRatio * groupRatioInfo.GroupRatio
-		preConsumedQuota = int(float64(preConsumedTokens) * ratio)
+		var saturated bool
+		preConsumedQuota, saturated = common.SafeQuotaFromFloat(float64(preConsumedTokens) * ratio)
+		if saturated {
+			logPriceSaturation(c, info, "preconsume_ratio", preConsumedQuota)
+		}
 	} else {
 		if meta.ImagePriceRatio != 0 {
 			modelPrice = modelPrice * meta.ImagePriceRatio
 		}
-		preConsumedQuota = int(modelPrice * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
+		var saturated bool
+		preConsumedQuota, saturated = common.SafeQuotaFromFloat(modelPrice * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
+		if saturated {
+			logPriceSaturation(c, info, "preconsume_price", preConsumedQuota)
+		}
 	}
 
 	// check if free model pre-consume is disabled
@@ -194,7 +217,7 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 	freeModel := false
 
 	if usePrice {
-		quota = int(modelPrice * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
+		quota, _ = common.SafeQuotaFromFloat(modelPrice * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
 		if !operation_setting.GetQuotaSetting().EnableFreeModelPreConsume {
 			if groupRatioInfo.GroupRatio == 0 || modelPrice == 0 {
 				quota = 0
@@ -203,7 +226,7 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		}
 	} else {
 		// 按量计费：以模型倍率的一半作为预扣额度
-		quota = int(modelRatio / 2 * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
+		quota, _ = common.SafeQuotaFromFloat(modelRatio / 2 * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
 		modelPrice = -1
 		if !operation_setting.GetQuotaSetting().EnableFreeModelPreConsume {
 			if groupRatioInfo.GroupRatio == 0 || modelRatio == 0 {

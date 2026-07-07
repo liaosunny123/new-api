@@ -224,6 +224,13 @@ func GetAndValidOpenAIImageRequest(c *gin.Context, relayMode int) (*dto.ImageReq
 		}
 	}
 
+	// Bound the requested image count. n flows into quota as a raw multiplier;
+	// an oversized value can overflow the billing math and wrap to a negative
+	// (credit) charge. See common.MaxImageN.
+	if imageRequest.N != nil && *imageRequest.N > common.MaxImageN {
+		return nil, errors.New("n is too large")
+	}
+
 	return imageRequest, nil
 }
 
@@ -238,6 +245,12 @@ func GetAndValidateClaudeRequest(c *gin.Context) (textRequest *dto.ClaudeRequest
 	}
 	if textRequest.Model == "" {
 		return nil, errors.New("field model is required")
+	}
+	// Bound user-supplied max_tokens: it is added into the pre-consumed quota,
+	// so an oversized value can overflow the billing math.
+	if lo.FromPtrOr(textRequest.MaxTokens, uint(0)) > common.MaxTokensLimit ||
+		lo.FromPtrOr(textRequest.MaxTokensToSample, uint(0)) > common.MaxTokensLimit {
+		return nil, errors.New("max_tokens is invalid")
 	}
 
 	//if textRequest.Stream {
@@ -313,6 +326,10 @@ func GetAndValidateGeminiRequest(c *gin.Context) (*dto.GeminiChatRequest, error)
 	}
 	if len(request.Contents) == 0 && len(request.Requests) == 0 {
 		return nil, errors.New("contents is required")
+	}
+	// Bound user-supplied maxOutputTokens (feeds pre-consumed quota math).
+	if request.GenerationConfig.MaxOutputTokens != nil && *request.GenerationConfig.MaxOutputTokens > common.MaxTokensLimit {
+		return nil, errors.New("maxOutputTokens is invalid")
 	}
 
 	//if c.Query("alt") == "sse" {

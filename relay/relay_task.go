@@ -121,6 +121,9 @@ func ResolveOriginTask(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskErr
 			if seconds <= 0 {
 				seconds = 4
 			}
+			if seconds > common.MaxVideoSeconds {
+				seconds = common.MaxVideoSeconds
+			}
 			sizeStr, _ := taskData["size"].(string)
 			if info.PriceData.OtherRatios == nil {
 				info.PriceData.OtherRatios = map[string]float64{}
@@ -197,7 +200,8 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	if !common.StringsContains(constant.TaskPricePatches, modelName) {
 		for _, ra := range info.PriceData.OtherRatios {
 			if ra != 1.0 {
-				info.PriceData.Quota = int(float64(info.PriceData.Quota) * ra)
+				// 饱和转换：防止超大 seconds/duration 使额度溢出 int 变负（负额度会被当作退款充值）
+				info.PriceData.Quota, _ = common.SafeQuotaFromFloat(float64(info.PriceData.Quota) * ra)
 			}
 		}
 	}
@@ -275,7 +279,9 @@ func recalcQuotaFromRatios(info *relaycommon.RelayInfo, ratios map[string]float6
 			result *= ra
 		}
 	}
-	return int(result)
+	// 饱和转换：防止超大 seconds/duration 等参数使乘积溢出 int 变为负数（负额度会被当作退款充值）
+	quota, _ := common.SafeQuotaFromFloat(result)
+	return quota
 }
 
 var fetchRespBuilders = map[int]func(c *gin.Context) (respBody []byte, taskResp *dto.TaskError){
