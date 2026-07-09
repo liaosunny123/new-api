@@ -117,6 +117,11 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 
 	summary.CacheTokens = usage.PromptTokensDetails.CachedTokens
 	summary.CacheCreationTokens = usage.PromptTokensDetails.CachedCreationTokens
+	// 兼容 OpenAI/Responses（GPT-5.6+）的缓存写入字段（cache_write_tokens / cache_creation_tokens）：
+	// Claude 走 CachedCreationTokens；OpenAI 走上述两个字段之一，取较大者，二者取 max 不会重复计费。
+	if w := usage.PromptTokensDetails.EffectiveCacheWriteTokens(); w > summary.CacheCreationTokens {
+		summary.CacheCreationTokens = w
+	}
 	summary.CacheCreationTokens5m = usage.ClaudeCacheCreation5mTokens
 	summary.CacheCreationTokens1h = usage.ClaudeCacheCreation1hTokens
 	summary.ImageTokens = usage.PromptTokensDetails.ImageTokens

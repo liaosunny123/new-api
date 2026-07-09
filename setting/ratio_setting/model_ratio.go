@@ -509,6 +509,11 @@ func getHardcodedCompletionModelRatio(name string) (float64, bool) {
 		}
 		// gpt-5 匹配
 		if strings.HasPrefix(name, "gpt-5") {
+			// gpt-5.6（Sol/Terra/Luna）输出均为输入的 6 倍：30/5、15/2.5、6/1。
+			// 仅作为默认值、不锁定：运营可在界面自行修改，填了就以运营的值计费。
+			if strings.HasPrefix(name, "gpt-5.6") {
+				return 6, false
+			}
 			if strings.HasPrefix(name, "gpt-5.5") {
 				return 6, true
 			}

@@ -258,6 +258,20 @@ type InputTokenDetails struct {
 	TextTokens           int `json:"text_tokens"`
 	AudioTokens          int `json:"audio_tokens"`
 	ImageTokens          int `json:"image_tokens"`
+
+	// 缓存写入（cache write）token：GPT-5.6 起引入显式缓存断点、写入按 1.25x 计费。
+	// 上游存在两种写法，两个都解析、取较大者（见 EffectiveCacheWriteTokens）。
+	CacheWriteTokens    int `json:"cache_write_tokens,omitempty"`
+	CacheCreationTokens int `json:"cache_creation_tokens,omitempty"`
+}
+
+// EffectiveCacheWriteTokens 返回缓存写入 token：兼容 cache_write_tokens / cache_creation_tokens
+// 两种上游字段写法，取二者较大值（其一为 0 时取另一个）。
+func (d InputTokenDetails) EffectiveCacheWriteTokens() int {
+	if d.CacheWriteTokens > d.CacheCreationTokens {
+		return d.CacheWriteTokens
+	}
+	return d.CacheCreationTokens
 }
 
 type OutputTokenDetails struct {
