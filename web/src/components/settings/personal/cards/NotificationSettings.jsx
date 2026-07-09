@@ -33,7 +33,7 @@ import {
   Col,
 } from '@douyinfe/semi-ui';
 import { IconMail, IconKey, IconBell, IconLink } from '@douyinfe/semi-icons';
-import { ShieldCheck, Bell, DollarSign, Settings } from 'lucide-react';
+import { ShieldCheck, Bell, DollarSign, Settings, Zap } from 'lucide-react';
 import {
   renderQuotaWithPrompt,
   API,
@@ -794,6 +794,73 @@ const NotificationSettings = ({
                     '开启后，仅"消费"和"错误"日志将记录您的客户端IP地址',
                   )}
                 />
+              </div>
+            </TabPane>
+
+            {/* 请求对冲设置 Tab */}
+            <TabPane
+              tab={
+                <div className='flex items-center'>
+                  <Zap size={16} className='mr-2' />
+                  {t('请求对冲')}
+                </div>
+              }
+              itemKey='hedge'
+            >
+              <div className='py-4'>
+                <Form.Switch
+                  field='hedgeEnabled'
+                  label={t('开启请求对冲')}
+                  checkedText={t('开')}
+                  uncheckedText={t('关')}
+                  onChange={(value) => handleFormChange('hedgeEnabled', value)}
+                  extraText={t(
+                    '仅对 Claude 原生接口 /v1/messages 生效。某路上游在超时时间内未返回响应头时，自动并行发起下一路请求（旧路挂后台不取消），谁先成功即返回给您。若挂后台的旧路之后也成功返回，会对该次成功单独追补扣费（因为上游该次调用同样产生真实费用），请知悉可能对同一请求多次计费。',
+                  )}
+                />
+                <div className='mt-4'>
+                  <Form.InputNumber
+                    field='hedgeFirstResponseTimeout'
+                    label={t('首响应超时（秒）')}
+                    min={1}
+                    max={600}
+                    step={1}
+                    onChange={(value) =>
+                      handleFormChange('hedgeFirstResponseTimeout', value)
+                    }
+                    extraText={t(
+                      '某路上游超过该秒数仍未返回响应头，则并行发起下一路。默认 15 秒。',
+                    )}
+                  />
+                </div>
+                <div className='mt-4'>
+                  <Form.InputNumber
+                    field='hedgeMaxAttempts'
+                    label={t('最大并行路数')}
+                    min={1}
+                    max={10}
+                    step={1}
+                    onChange={(value) =>
+                      handleFormChange('hedgeMaxAttempts', value)
+                    }
+                    extraText={t('最多并行发起的请求路数。默认 5。')}
+                  />
+                </div>
+                <div className='mt-4'>
+                  <Form.InputNumber
+                    field='firstByteTimeout'
+                    label={t('首字节超时（秒）')}
+                    min={0}
+                    max={3000}
+                    step={1}
+                    onChange={(value) =>
+                      handleFormChange('firstByteTimeout', value)
+                    }
+                    extraText={t(
+                      '等待上游返回首个响应超过该秒数则该路超时失败（不影响已开始的流式输出）。0=使用系统默认；生效值取系统默认与此值的较大者，上限 3000。对所有上游请求生效，不限于对冲。',
+                    )}
+                  />
+                </div>
               </div>
             </TabPane>
 

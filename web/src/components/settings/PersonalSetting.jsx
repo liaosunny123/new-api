@@ -164,6 +164,10 @@ const PersonalSetting = () => {
         acceptUnsetModelRatioModel:
           settings.accept_unset_model_ratio_model || false,
         recordIpLog: settings.record_ip_log || false,
+        hedgeEnabled: settings.hedge_enabled || false,
+        hedgeFirstResponseTimeout: settings.hedge_first_response_timeout || 15,
+        hedgeMaxAttempts: settings.hedge_max_attempts || 5,
+        firstByteTimeout: settings.first_byte_timeout ?? 0,
       });
     }
   }, [userState?.user?.setting]);
@@ -435,6 +439,19 @@ const PersonalSetting = () => {
         accept_unset_model_ratio_model:
           notificationSettings.acceptUnsetModelRatioModel,
         record_ip_log: notificationSettings.recordIpLog,
+        hedge_enabled: notificationSettings.hedgeEnabled,
+        hedge_first_response_timeout: (() => {
+          const parsed = parseInt(notificationSettings.hedgeFirstResponseTimeout);
+          return isNaN(parsed) ? 15 : parsed;
+        })(),
+        hedge_max_attempts: (() => {
+          const parsed = parseInt(notificationSettings.hedgeMaxAttempts);
+          return isNaN(parsed) ? 5 : parsed;
+        })(),
+        first_byte_timeout: (() => {
+          const parsed = parseInt(notificationSettings.firstByteTimeout);
+          return isNaN(parsed) ? 0 : parsed;
+        })(),
       });
 
       if (res.data.success) {

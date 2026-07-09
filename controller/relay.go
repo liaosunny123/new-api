@@ -177,6 +177,21 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 	}()
 
+	// 请求对冲（仅 Claude /v1/messages，且用户在个人设置中开启）：
+	// 某路 N 秒未出响应头即并行发起下一路，首个成功者返回给用户，迟到成功的旧路后台追补扣费。
+	if relayFormat == types.RelayFormatClaude && relayInfo.UserSetting.HedgeEnabled {
+		if hedgeHandled, hedgeErr := hedgedClaudeRelay(c, relayInfo); hedgeHandled {
+			newAPIError = hedgeErr
+			if newAPIError == nil {
+				relayInfo.LastError = nil
+			} else {
+				relayInfo.LastError = newAPIError
+			}
+			return
+		}
+		// 未处理（Responses 转换分支）：回退到下方串行逻辑。
+	}
+
 	retryParam := &service.RetryParam{
 		Ctx:        c,
 		TokenGroup: relayInfo.TokenGroup,

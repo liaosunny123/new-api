@@ -318,6 +318,31 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	return resp, nil
 }
 
+// BuildApiRequest 构建发往上游的 *http.Request，但不执行 client.Do，也不触碰 c.Writer / 不启动 ping。
+// 供请求对冲（hedging）等需要自行控制并发与超时的场景使用：调用方拿到 *http.Request 后自行选择
+// client、设置 context 并执行 Do。
+func BuildApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Request, error) {
+	fullRequestURL, err := a.GetRequestURL(info)
+	if err != nil {
+		return nil, fmt.Errorf("get request url failed: %w", err)
+	}
+	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("new request failed: %w", err)
+	}
+	headers := req.Header
+	if err = a.SetupRequestHeader(c, &headers, info); err != nil {
+		return nil, fmt.Errorf("setup request header failed: %w", err)
+	}
+	// 在 SetupRequestHeader 之后应用 Header Override，确保用户设置优先级最高
+	headerOverride, err := processHeaderOverride(info, c)
+	if err != nil {
+		return nil, err
+	}
+	applyHeaderOverrideToRequest(req, headerOverride)
+	return req, nil
+}
+
 func DoFormRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Response, error) {
 	fullRequestURL, err := a.GetRequestURL(info)
 	if err != nil {
@@ -484,15 +509,12 @@ func DoRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	return doRequest(c, req, info)
 }
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
-	var client *http.Client
-	var err error
-	if info.ChannelSetting.Proxy != "" {
-		client, err = service.NewProxyHttpClient(info.ChannelSetting.Proxy)
-		if err != nil {
-			return nil, fmt.Errorf("new proxy http client failed: %w", err)
-		}
-	} else {
-		client = service.GetHttpClient()
+	// 首字节硬超时：生效值 = max(系统默认, 用户设置)，上限 3000；限制"等待上游首个响应头"的时间，
+	// 不影响已开始的流式 body。
+	rht := service.EffectiveFirstByteTimeout(info.UserSetting.GetFirstByteTimeout())
+	client, err := service.GetHttpClientWithResponseHeaderTimeout(rht, info.ChannelSetting.Proxy)
+	if err != nil {
+		return nil, fmt.Errorf("new http client failed: %w", err)
 	}
 
 	var stopPinger context.CancelFunc

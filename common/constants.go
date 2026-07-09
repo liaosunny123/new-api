@@ -127,6 +127,11 @@ var BatchUpdateInterval int
 
 var RelayTimeout int // unit is second
 
+// FirstByteTimeout 上游"等待首个响应头/首字节"的系统默认超时（秒）。
+// 通过 http.Transport.ResponseHeaderTimeout 生效：只限制到首个响应头的等待时间，
+// 不影响已开始的流式 body。<=0 表示不限制。可被用户个人设置按 max 覆盖。
+var FirstByteTimeout int
+
 var RelayMaxIdleConns int
 var RelayMaxIdleConnsPerHost int
 

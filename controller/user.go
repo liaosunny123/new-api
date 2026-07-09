@@ -1100,6 +1100,10 @@ type UpdateUserSettingRequest struct {
 	UpstreamModelUpdateNotifyEnabled *bool   `json:"upstream_model_update_notify_enabled,omitempty"`
 	AcceptUnsetModelRatioModel       bool    `json:"accept_unset_model_ratio_model"`
 	RecordIpLog                      bool    `json:"record_ip_log"`
+	HedgeEnabled                     bool    `json:"hedge_enabled"`
+	HedgeFirstResponseTimeout        int     `json:"hedge_first_response_timeout"`
+	HedgeMaxAttempts                 int     `json:"hedge_max_attempts"`
+	FirstByteTimeout                 int     `json:"first_byte_timeout"`
 }
 
 func UpdateUserSetting(c *gin.Context) {
@@ -1203,6 +1207,28 @@ func UpdateUserSetting(c *gin.Context) {
 	settings.UpstreamModelUpdateNotifyEnabled = upstreamModelUpdateNotifyEnabled
 	settings.AcceptUnsetRatioModel = req.AcceptUnsetModelRatioModel
 	settings.RecordIpLog = req.RecordIpLog
+
+	// 请求对冲设置（仅 Claude /v1/messages 生效）：越界值钳制回默认值
+	settings.HedgeEnabled = req.HedgeEnabled
+	if req.HedgeFirstResponseTimeout < dto.HedgeMinFirstResponseTimeout || req.HedgeFirstResponseTimeout > dto.HedgeMaxFirstResponseTimeout {
+		settings.HedgeFirstResponseTimeout = dto.HedgeDefaultFirstResponseTimeout
+	} else {
+		settings.HedgeFirstResponseTimeout = req.HedgeFirstResponseTimeout
+	}
+	if req.HedgeMaxAttempts < dto.HedgeMinMaxAttempts || req.HedgeMaxAttempts > dto.HedgeMaxMaxAttempts {
+		settings.HedgeMaxAttempts = dto.HedgeDefaultMaxAttempts
+	} else {
+		settings.HedgeMaxAttempts = req.HedgeMaxAttempts
+	}
+
+	// 首字节硬超时：0 保留为"未设置"（用系统默认）；1..3000 有效；>3000 截为上限
+	if req.FirstByteTimeout <= 0 {
+		settings.FirstByteTimeout = 0
+	} else if req.FirstByteTimeout > dto.FirstByteMax {
+		settings.FirstByteTimeout = dto.FirstByteMax
+	} else {
+		settings.FirstByteTimeout = req.FirstByteTimeout
+	}
 
 	// 重置由本接口管理的通知相关字段，按当前请求的通知类型重新填充
 	settings.WebhookUrl = ""
