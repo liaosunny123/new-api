@@ -77,6 +77,21 @@ func isLegacyClaudeDerivedOpenAIUsage(relayInfo *relaycommon.RelayInfo, usage *d
 	return usage.ClaudeCacheCreation5mTokens > 0 || usage.ClaudeCacheCreation1hTokens > 0
 }
 
+// GPT-5.4 / 5.5 / 5.6 长上下文分档：输入上下文超过阈值时，
+// 输入 / 缓存读取 / 缓存写入 ×2，输出 ×1.5。
+const (
+	longContextThreshold = 272000
+	longContextInputMul  = 2.0 // 输入、缓存读取、缓存写入倍数
+	longContextOutputMul = 1.5 // 输出倍数
+)
+
+// isLongContextTierModel 判断模型是否启用长上下文分档（gpt-5.4 / gpt-5.5 / gpt-5.6 三系）。
+func isLongContextTierModel(name string) bool {
+	return strings.HasPrefix(name, "gpt-5.4") ||
+		strings.HasPrefix(name, "gpt-5.5") ||
+		strings.HasPrefix(name, "gpt-5.6")
+}
+
 func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage) textQuotaSummary {
 	summary := textQuotaSummary{
 		ModelName:            relayInfo.OriginModelName,
@@ -113,6 +128,14 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 			summary.PromptTokens = estimatedPrompt
 			summary.TotalTokens = estimatedPrompt
 		}
+	}
+
+	// GPT-5.4/5.5/5.6 长上下文分档：输入上下文 > 272K 时，输入/缓存读取/缓存写入 ×2、输出 ×1.5。
+	// 最终计费 = (输入 + 缓存 + 输出) × ModelRatio：先 ModelRatio ×2（四项都变 2×），
+	// 再 CompletionRatio ×(1.5/2)=×0.75，把输出净额拉回 1.5×。
+	if summary.PromptTokens > longContextThreshold && isLongContextTierModel(summary.ModelName) {
+		summary.ModelRatio *= longContextInputMul
+		summary.CompletionRatio *= longContextOutputMul / longContextInputMul
 	}
 
 	summary.CacheTokens = usage.PromptTokensDetails.CachedTokens
