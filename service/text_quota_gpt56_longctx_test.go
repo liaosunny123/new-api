@@ -48,6 +48,7 @@ func TestLongContextTierPricing(t *testing.T) {
 	longGpt56 := calculateTextQuotaSummary(ctx, newInfo("gpt-5.6-terra"), newUsage(300000))
 	require.Equal(t, float64(2), longGpt56.ModelRatio)
 	require.Equal(t, 1.5, longGpt56.CompletionRatio) // 2 × 0.75
+	require.True(t, longGpt56.LongContextTier, "长档应打标记(用于日志'其他详情'展示)")
 
 	// 精确数值：
 	//   输入 base = 300000-100000-50000 = 150000
@@ -69,6 +70,7 @@ func TestLongContextTierPricing(t *testing.T) {
 	shortGpt56 := calculateTextQuotaSummary(ctx, newInfo("gpt-5.6-terra"), newUsage(200000))
 	require.Equal(t, float64(1), shortGpt56.ModelRatio)
 	require.Equal(t, float64(2), shortGpt56.CompletionRatio)
+	require.False(t, shortGpt56.LongContextTier, "短档不打标记")
 
 	// 边界：恰好 272000 属短档（≤），不翻倍；272001 翻倍
 	require.Equal(t, float64(1), calculateTextQuotaSummary(ctx, newInfo("gpt-5.6-terra"), newUsage(272000)).ModelRatio)

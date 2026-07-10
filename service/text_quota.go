@@ -43,6 +43,7 @@ type textQuotaSummary struct {
 	Quota                    int
 	IsClaudeUsageSemantic    bool
 	UsageSemantic            string
+	LongContextTier          bool // 命中 gpt-5.4/5.5/5.6 长上下文档（>272K）
 	WebSearchPrice           float64
 	WebSearchCallCount       int
 	ClaudeWebSearchPrice     float64
@@ -136,6 +137,7 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	if summary.PromptTokens > longContextThreshold && isLongContextTierModel(summary.ModelName) {
 		summary.ModelRatio *= longContextInputMul
 		summary.CompletionRatio *= longContextOutputMul / longContextInputMul
+		summary.LongContextTier = true
 	}
 
 	summary.CacheTokens = usage.PromptTokensDetails.CachedTokens
@@ -395,6 +397,10 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if strings.HasPrefix(logModel, "gpt-4o-gizmo") {
 		logModel = "gpt-4o-gizmo-*"
 		extraContent = append(extraContent, fmt.Sprintf("模型 %s", summary.ModelName))
+	}
+
+	if summary.LongContextTier {
+		extraContent = append(extraContent, "长上下文档 >272K（输入/缓存 ×2，输出 ×1.5）")
 	}
 
 	logContent := strings.Join(extraContent, ", ")
